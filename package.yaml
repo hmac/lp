@@ -10,20 +10,19 @@ extra-source-files:
 - README.md
 - ChangeLog.md
 
-# Metadata used when publishing your package
-# synopsis:            Short description of your package
-# category:            Web
-
-# To avoid duplicated efforts in documentation and dealing with the
-# complications of embedding Haddock markup inside cabal files, it is
-# common to point users to the README.md file.
-description:         Please see the README on GitHub at <https://github.com/githubuser/lp#readme>
+description:         Please see the README on GitHub at <https://github.com/hmac/lp>
 
 dependencies:
 - base >= 4.7 && < 5
+- recursion-schemes
+- deriving-compat
+- transformers
+- megaparsec
 
 library:
   source-dirs: src
+  ghc-options:
+  - -Wall
 
 executables:
   lp-exe:
@@ -46,3 +45,5 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - lp
+    - hspec
+    - hspec-megaparsec
