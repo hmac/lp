@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE FlexibleInstances #-}
 module Expr where
 
 import Prelude hiding (pi)
@@ -8,17 +9,30 @@ import Prelude hiding (pi)
 import Data.Functor.Foldable
 import Data.Eq.Deriving
 import Text.Show.Deriving
+import Data.List (elemIndex)
 
-data ExprF a = Var String
-            | Ann a a
-            | App a a
-            | Lam String a -- TODO: rethink binders?
-            | Pi String a a
-            | Type
-            deriving (Show, Eq, Functor)
+data ExprF b x r -- r: inductive type, b: binder type, x: variable type
+  = Var x
+  | Ann r r
+  | App r r
+  | Lam b r
+  | Pi b r r
+  | Type
+  deriving (Show, Eq, Functor)
 
 $(deriveEq1 ''ExprF)
 $(deriveShow1 ''ExprF)
+
+-- The frontend syntax
+-- Explicit variable names represented as Strings
+type FExprF = ExprF String String
+
+-- The backend syntax
+-- Variables represented with De Bruijn indices
+type BExprF = ExprF () Int
+
+type Expr = Fix FExprF
+type BExpr = Fix BExprF
 
 -- Convenience constructors
 var :: String -> Expr
@@ -39,21 +53,48 @@ pi s t e = Fix (Pi s t e)
 type_ :: Expr
 type_ = Fix Type
 
-type Expr = Fix ExprF
+class Pretty a where
+  pretty :: a -> String
 
-pretty :: Expr -> String
-pretty expr = cata f expr
-  where f :: ExprF String -> String
-        f = \case
-              Var v    -> v
-              Ann e t  -> e <> " : " <> t
-              App x y  -> x <> " " <> y
-              Lam v e  -> "(λ" <> v <> ". " <> e <> ")"
-              Pi x t e -> "∀ (" <> x <> " : " <> t <> "). " <> e
-              Type     -> "Type"
+instance Pretty (Fix (ExprF String String)) where
+  pretty expr = cata f expr
+    where f :: FExprF String -> String
+          f = \case
+                Var v    -> v
+                Ann e t  -> e <> " : " <> t
+                App x y  -> x <> " " <> y
+                Lam v e  -> "(λ" <> v <> ". " <> e <> ")"
+                Pi x t e -> "∀ (" <> x <> " : " <> t <> "). " <> e
+                Type     -> "Type"
 
-pp :: Expr -> IO ()
+instance Pretty (Fix (ExprF () Int)) where
+  pretty expr = cata f expr
+    where f :: BExprF String -> String
+          f = \case
+                Var i    -> show i
+                Ann e t  -> e <> " : " <> t
+                App x y  -> x <> " " <> y
+                Lam v e  -> "(λ. " <> e <> ")"
+                Pi x t e -> "∀ ( : " <> t <> "). " <> e
+                Type     -> "Type"
+
+pp :: Pretty e => e -> IO ()
 pp = putStrLn . pretty
+
+-- Convert the frontend syntax into the backend syntax, replacing explicit
+-- variable names with De Bruijn indices
+-- TODO: recursion scheme
+translate :: Expr -> BExpr
+translate expr = go [] expr
+  where go ctx = \case
+                   Fix (Var x) -> case elemIndex x ctx of
+                                   Just i -> Fix (Var i)
+                                   Nothing -> error $ "Cannot find variable " ++ x
+                   Fix (Ann e t) -> Fix $ Ann (go ctx e) (go ctx t)
+                   Fix (App a b) -> Fix $ App (go ctx a) (go ctx b)
+                   Fix (Lam x e) -> Fix $ Lam () (go (x : ctx) e)
+                   Fix (Pi x t e) -> Fix $ Pi () (go ctx t) (go (x : ctx) e)
+                   Fix Type -> Fix Type
 
 type Context = [(String, Expr)]
 

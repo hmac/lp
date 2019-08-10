@@ -18,13 +18,19 @@ runParse input = case parse expr "" input of
 -- TODO: space consumer
 
 expr :: Parser Expr
-expr = application <|> aexpr
+expr = try annotation <|> application <|> aexpr
 
 application :: Parser Expr
 application = foldl1 app <$> (aexpr `sepBy` string " ")
 
 aexpr :: Parser Expr
 aexpr = ptype <|> lambda <|> forall <|> parens expr <|> pvar
+
+annotation :: Parser Expr
+annotation = do
+  e <- aexpr
+  _ <- string " : " -- space consumer
+  ann e <$> aexpr
 
 ptype :: Parser Expr
 ptype = string "Type" >> pure type_

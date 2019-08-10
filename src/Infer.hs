@@ -1,4 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
 module Infer where
 
 import Data.Functor.Foldable
@@ -7,10 +6,23 @@ import Control.Monad.Trans.Except
 import Control.Monad.Trans.Class (lift, MonadTrans)
 
 import Expr
-import Eval (nfc, substitute)
+import Eval (nfc', substitute)
+
+nfc :: Context -> Expr -> Expr
+nfc = nfc'
 
 type Env = (Context, Context) -- (types, values)
--- TODO: should we have a sigle environment containing both types and terms?
+-- TODO: should we have a single environment containing both types and terms?
+
+-- A helper to let us annotate errors with their source
+infixr 5 <?>
+(<?>) :: ReaderT Env (Except String) a -> String -> ReaderT Env (Except String) a
+e <?> s = let f err = err <> " " <> s
+           in mapReaderT (withExceptT f) e
+
+label :: String -> ReaderT Env (Except String) a -> ReaderT Env (Except String) a
+label = flip (<?>)
+
 runInfer :: Env -> Expr -> Either String Expr
 runInfer env expr = runExcept (runReaderT (infer expr) env)
 
@@ -18,7 +30,7 @@ runInfer env expr = runExcept (runReaderT (infer expr) env)
 infer :: Expr -> ReaderT Env (Except String) Expr
 
 -- ANN
-infer (Fix (Ann e t)) = do
+infer (Fix (Ann e t)) = label "ANN" $ do
   check t (Fix Type)
   (_, vals) <- ask
   let t' = nfc vals t
@@ -29,7 +41,7 @@ infer (Fix (Ann e t)) = do
 infer (Fix Type) = pure (Fix Type)
 
 -- VAR
-infer (Fix (Var v)) = do
+infer (Fix (Var v)) = label "VAR" $ do
   (types, _) <- ask
   case lookup v types of
     Just t -> pure t
@@ -37,7 +49,7 @@ infer (Fix (Var v)) = do
       throw $ "could not determine type of variable " <> v <> "\n" <> show types
 
 -- PI
-infer (Fix (Pi x t e)) = do
+infer (Fix (Pi x t e)) = label "PI" $ do
   _ <- check t (Fix Type)
   (types, vals) <- ask
   let t' = nfc vals t
@@ -46,7 +58,7 @@ infer (Fix (Pi x t e)) = do
   pure (Fix Type)
 
 -- APP
-infer (Fix (App e e')) = do
+infer (Fix (App e e')) = label "APP" $ do
   et <- infer e
   case et of
     Fix (Pi x t t') -> do
@@ -66,7 +78,7 @@ check :: Expr -> Expr -> ReaderT Env (Except String) ()
 -- in the Pi type *and* and the type of the variable in the lambda abstraction.
 -- I'm not 100% sure this is valid, since they should really refer to the same
 -- thing, but it seems to work for now.
-check (Fix (Lam x e)) (Fix (Pi x' t t')) = do
+check (Fix (Lam x e)) (Fix (Pi x' t t')) = label "LAM" $ do
   (types, vals) <- ask
   _ <- check (nfc vals t) (Fix Type)
   let env' = ((x', t) : (x, t) : types, vals)
@@ -76,7 +88,7 @@ check (Fix (Lam x e)) (Fix (Pi x' t t')) = do
 -- 𝚪 ⊢ e :↑ t
 ------------- (CHK)
 -- 𝚪 ⊢ e :↓ t
-check e t = do
+check e t = label "CHK" $ do
   env <- ask
   let (types, vals) = env
   t' <- nfc vals <$> infer e
