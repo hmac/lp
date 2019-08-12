@@ -1,6 +1,8 @@
 module Tutorial.Expr where
 
-data TermI = Ann TermC Type
+data TermI = Ann TermC TermC
+           | Star
+           | Pi TermC TermC
            | Bound Int
            | Free Name
            | TermI :@: TermC
@@ -15,22 +17,13 @@ data Name = Global String
           | Quote Int
           deriving (Show, Eq)
 
-data Type = TFree Name
-          | Fun Type Type
-          deriving (Show, Eq)
-
 data Value = VLam (Value -> Value)
            | VNeutral Neutral
+           | VStar
+           | VPi Value (Value -> Value)
 
 data Neutral = NFree Name
              | NApp Neutral Value
-
-data Kind = Star
-  deriving (Show)
-
-data Info = HasKind Kind
-          | HasType Type
-          deriving (Show)
 
 vfree :: Name -> Value
 vfree n = VNeutral (NFree n)

@@ -6,7 +6,9 @@ quote0 :: Value -> TermC
 quote0 = quote 0
 
 quote :: Int -> Value -> TermC
-quote i (VLam f) = Lam (quote (i + 1) (f (vfree (Quote i))))
+quote _ VStar        = Inf Star
+quote i (VPi v f)    = Inf (Pi (quote i v) (quote (i + 1) (f (vfree (Quote i)))))
+quote i (VLam f)     = Lam (quote (i + 1) (f (vfree (Quote i))))
 quote i (VNeutral n) = Inf (neutralQuote i n)
 
 neutralQuote :: Int -> Neutral -> TermI
