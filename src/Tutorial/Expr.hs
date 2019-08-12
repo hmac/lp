@@ -29,5 +29,5 @@ vfree :: Name -> Value
 vfree n = VNeutral (NFree n)
 
 vapp :: Value -> Value -> Value
-vapp (VLam f) v = f v
+vapp (VLam     f) v = f v
 vapp (VNeutral n) v = VNeutral (NApp n v)
