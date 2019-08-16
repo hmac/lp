@@ -8,8 +8,12 @@ import           Tutorial.Parse                 ( runParse
                                                 )
 import           Tutorial.Infer                 ( typeI0
                                                 , Type
+                                                , Context
                                                 )
 import           Tutorial.Eval                  ( evalI )
+import           Data.Text.Prettyprint.Doc      ( pretty
+                                                , Pretty
+                                                )
 
 main :: IO ()
 main = go []
@@ -17,19 +21,21 @@ main = go []
   go env = do
     input <- getLine
     let result = run input env
+    print result
     go (environment result) -- TODO: parse 'assume/let' commands that add things to the environment
 
 
-run :: String -> Result
-run input =
+run :: String -> Context -> Result
+run input env =
   let simpleAST    = runParse input
       term         = simpleAST >>= convert
       inferredType = term >>= typeI0 []
       evaluated    = flip evalI [] <$> term
-  in  R { simple    = simpleAST
-        , parsed    = term
-        , inferred  = inferredType
-        , evaluated = evaluated
+  in  R { simple      = simpleAST
+        , parsed      = term
+        , inferred    = inferredType
+        , evaluated   = evaluated
+        , environment = env
         }
 
 data Result = R { simple :: Either String Expr
@@ -42,14 +48,15 @@ data Result = R { simple :: Either String Expr
 instance Show Result where
   show R { simple = s, parsed = p, inferred = i, evaluated = e } =
     "R {\n"
-      <> ("\tsimple = " <> show s <> "\n")
-      <> ("\tparsed = " <> show p <> "\n")
-      <> ("\tinferred = " <> showValue i <> "\n")
-      <> ("\tevaluated = " <> showValue e <> "\n")
+      <> ("\tsimple = " <> printEither s <> "\n")
+      <> ("\tparsed = " <> printEither p <> "\n")
+      <> ("\tinferred = " <> printEither (quote0 <$> i) <> "\n")
+      <> ("\tevaluated = " <> printEither (quote0 <$> e) <> "\n")
       <> "}"
    where
-    showValue (Left  err) = err
-    showValue (Right v  ) = show (quote0 v)
+    printEither :: Pretty a => Either String a -> String
+    printEither (Left  err) = err
+    printEither (Right a  ) = show (pretty a)
 
 forever :: Monad m => m a -> m a
 forever f = f >> forever f

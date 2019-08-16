@@ -6,6 +6,12 @@ import           Data.Void
 import           Data.List                      ( elemIndex )
 
 import           Tutorial.Expr
+import           Data.Text.Prettyprint.Doc      ( pretty
+                                                , (<+>)
+                                                , Pretty
+                                                )
+import qualified Data.Text.Prettyprint.Doc     as Print
+                                                ( parens )
 
 type Parser = Parsec Void String
 
@@ -16,6 +22,18 @@ data Expr = Anno Expr Expr
           | Var String
           | App Expr Expr
           deriving (Show)
+
+instance Pretty Expr where
+  pretty Type       = pretty "*"
+  pretty (Anno e t) = pretty e <+> pretty ":" <+> pretty t
+  pretty (Forall s t e) =
+    pretty "forall"
+      <+> Print.parens (pretty s <+> pretty ":" <+> pretty t)
+      <>  pretty "."
+      <+> pretty e
+  pretty (Lambda s e) = pretty "\\" <> pretty s <> pretty "." <+> pretty e
+  pretty (Var s     ) = pretty s
+  pretty (App a b   ) = pretty a <+> pretty b
 
 runParse :: String -> Either String Expr
 runParse input = case parse expr "" input of
