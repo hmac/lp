@@ -32,15 +32,18 @@ reduceList ctx expr = go [expr]
     let e' = reduce ctx e in if e' == e then e : es else go (e' : e : es)
   go _ = [expr]
 
+-- TODO: what about reducing applications of (Pi ...) x ?
 reduce :: Context -> BExpr -> BExpr
 reduce ctx (Fix expr) = case expr of
-  App (Fix l@(Lam _ _)) (Fix b) -> breduce (Fix l) (Fix b)
-  App a                 b       -> Fix $ App (reduce ctx a) (reduce ctx b)
-  Lam v                 e       -> Fix $ Lam v (reduce ctx e)
-  Var i                         -> fromMaybe (Fix (Var i)) (safeIndex i ctx)
-  Ann e t                       -> Fix $ Ann (reduce ctx e) (reduce ctx t)
-  Pi x t e                      -> Fix $ Pi x (reduce ctx t) (reduce ctx e)
-  Type                          -> Fix Type
+  App (Fix l@Lam{}  ) b -> breduce (Fix l) b
+  App (Fix p@Pi{}   ) b -> breduce (Fix p) b
+  App (Fix (Ann e _)) b -> reduce ctx (Fix (App e b))
+  App a               b -> Fix $ App (reduce ctx a) (reduce ctx b)
+  Lam v               e -> Fix $ Lam v (reduce ctx e)
+  Var i                 -> fromMaybe (Fix (Var i)) (safeIndex i ctx)
+  Ann e t               -> Fix $ Ann (reduce ctx e) (reduce ctx t)
+  Pi x t e              -> Fix $ Pi x (reduce ctx t) (reduce ctx e)
+  Type                  -> Fix Type
 
 -- TODO: this is so messy and complex - surely we can simplify it
 breduce :: BExpr -> BExpr -> BExpr
@@ -48,27 +51,30 @@ breduce (Fix (Lam _ (Fix e))) (Fix b) =
   -- Substitute matching variables
   let e'  = sub b 0 e
   -- Decrement free variables
-      e'' = decFree 0 e'
-                                  -- Remove lambda
+      e'' = decFree e'
   in  Fix e''
- where
-  sub b i (Var j) | i == j    = b
-                  | otherwise = Var j
-  sub b i (Lam v (Fix e)) = Lam v (Fix (sub b (i + 1) e))
-  sub b i (Pi x (Fix t) (Fix e)) =
-    Pi x (Fix (sub b i t)) (Fix (sub b (i + 1) e))
-  sub b i Type                    = Type
-  sub b i (Ann (Fix e ) (Fix t )) = Ann (Fix (sub b i e)) (Fix (sub b i t))
-  sub b i (App (Fix e1) (Fix e2)) = App (Fix (sub b i e1)) (Fix (sub b i e2))
+breduce (Fix (Pi _ _ (Fix t))) (Fix b) =
+  let t' = decFree (sub b 0 t) in Fix t'
 
-  decFree i (Var j) | j > i     = Var (j - 1)
-                    | otherwise = Var j
-  decFree i (Lam v (Fix e)) = Lam v (Fix (decFree (i + 1) e))
-  decFree i (Pi x (Fix t) (Fix e)) =
-    Pi x (Fix (decFree i t)) (Fix (decFree (i + 1) e))
-  decFree i Type                  = Type
-  decFree i (Ann (Fix e) (Fix t)) = Ann (Fix (decFree i e)) (Fix (decFree i t))
-  decFree i (App (Fix a) (Fix b)) = App (Fix (decFree i a)) (Fix (decFree i b))
+sub :: ExprF () Int BExpr -> Int -> ExprF () Int BExpr -> ExprF () Int BExpr
+sub b i (Var j) | i == j    = b
+                | otherwise = Var j
+sub b i (Lam v (Fix e)       )  = Lam v (Fix (sub b (i + 1) e))
+sub b i (Pi x (Fix t) (Fix e))  = Pi x (Fix (sub b i t)) (Fix (sub b (i + 1) e))
+sub _ _ Type                    = Type
+sub b i (Ann (Fix e ) (Fix t )) = Ann (Fix (sub b i e)) (Fix (sub b i t))
+sub b i (App (Fix e1) (Fix e2)) = App (Fix (sub b i e1)) (Fix (sub b i e2))
+
+decFree :: ExprF () Int BExpr -> ExprF () Int BExpr
+decFree = go 0
+ where
+  go i (Var j) | j > i     = Var (j - 1)
+               | otherwise = Var j
+  go i (Lam v (Fix e)       ) = Lam v (Fix (go (i + 1) e))
+  go i (Pi x (Fix t) (Fix e)) = Pi x (Fix (go i t)) (Fix (go (i + 1) e))
+  go _ Type                   = Type
+  go i (Ann (Fix e) (Fix t))  = Ann (Fix (go i e)) (Fix (go i t))
+  go i (App (Fix a) (Fix b))  = App (Fix (go i a)) (Fix (go i b))
 
 substitute :: String -> Expr -> Expr -> Expr
 substitute v a b = topDown' alg a
@@ -96,4 +102,4 @@ topDown f = Fix . fmap (topDown f) . unfix . f
 safeIndex :: Int -> [a] -> Maybe a
 safeIndex _ []       = Nothing
 safeIndex 0 (x : _ ) = Just x
-safeIndex i (x : xs) = safeIndex (i - 1) xs
+safeIndex i (_ : xs) = safeIndex (i - 1) xs

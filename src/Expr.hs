@@ -4,12 +4,12 @@
 {-# LANGUAGE FlexibleInstances #-}
 module Expr where
 
-import Prelude hiding (pi)
+import           Prelude                 hiding ( pi )
 
-import Data.Functor.Foldable
-import Data.Eq.Deriving
-import Text.Show.Deriving
-import Data.List (elemIndex)
+import           Data.Functor.Foldable
+import           Data.Eq.Deriving
+import           Text.Show.Deriving
+import           Data.List                      ( elemIndex )
 
 data ExprF b x r -- r: inductive type, b: binder type, x: variable type
   = Var x
@@ -53,48 +53,21 @@ pi s t e = Fix (Pi s t e)
 type_ :: Expr
 type_ = Fix Type
 
-class Pretty a where
-  pretty :: a -> String
-
-instance Pretty (Fix (ExprF String String)) where
-  pretty expr = cata f expr
-    where f :: FExprF String -> String
-          f = \case
-                Var v    -> v
-                Ann e t  -> e <> " : " <> t
-                App x y  -> x <> " " <> y
-                Lam v e  -> "(λ" <> v <> ". " <> e <> ")"
-                Pi x t e -> "∀ (" <> x <> " : " <> t <> "). " <> e
-                Type     -> "Type"
-
-instance Pretty (Fix (ExprF () Int)) where
-  pretty expr = cata f expr
-    where f :: BExprF String -> String
-          f = \case
-                Var i    -> show i
-                Ann e t  -> e <> " : " <> t
-                App x y  -> x <> " " <> y
-                Lam v e  -> "(λ. " <> e <> ")"
-                Pi x t e -> "∀ ( : " <> t <> "). " <> e
-                Type     -> "Type"
-
-pp :: Pretty e => e -> IO ()
-pp = putStrLn . pretty
-
 -- Convert the frontend syntax into the backend syntax, replacing explicit
 -- variable names with De Bruijn indices
 -- TODO: recursion scheme
 translate :: Expr -> BExpr
 translate expr = go [] expr
-  where go ctx = \case
-                   Fix (Var x) -> case elemIndex x ctx of
-                                   Just i -> Fix (Var i)
-                                   Nothing -> error $ "Cannot find variable " ++ x
-                   Fix (Ann e t) -> Fix $ Ann (go ctx e) (go ctx t)
-                   Fix (App a b) -> Fix $ App (go ctx a) (go ctx b)
-                   Fix (Lam x e) -> Fix $ Lam () (go (x : ctx) e)
-                   Fix (Pi x t e) -> Fix $ Pi () (go ctx t) (go (x : ctx) e)
-                   Fix Type -> Fix Type
+ where
+  go ctx = \case
+    Fix (Var x) -> case elemIndex x ctx of
+      Just i  -> Fix (Var i)
+      Nothing -> error $ "Cannot find variable " ++ x
+    Fix (Ann e t ) -> Fix $ Ann (go ctx e) (go ctx t)
+    Fix (App a b ) -> Fix $ App (go ctx a) (go ctx b)
+    Fix (Lam x e ) -> Fix $ Lam () (go (x : ctx) e)
+    Fix (Pi x t e) -> Fix $ Pi () (go ctx t) (go (x : ctx) e)
+    Fix Type       -> Fix Type
 
 type Context = [(String, Expr)]
 

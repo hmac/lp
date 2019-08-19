@@ -8,10 +8,13 @@ import           Control.Monad.Trans.Class      ( lift
                                                 )
 
 import           Expr                    hiding ( Context )
+import           Expr.Pretty -- to import orphan Pretty instances for Expr
 import           Eval                           ( nfc
-                                                , substitute
                                                 , reduce
                                                 )
+import           Pretty
+
+import           System.IO.Unsafe               ( unsafePerformIO )
 
 type Context = [BExpr]
 type Env = (Context, Context) -- (types, values)
@@ -36,8 +39,8 @@ infer :: BExpr -> ReaderT Env (Except String) BExpr
 -- ANN
 infer (Fix (Ann e t)) = label "ANN" $ do
   check t (Fix Type)
-  (_, vals) <- ask
-  let t' = nfc vals t
+  (types, _vals) <- ask
+  let t' = nfc types t
   check e t'
   pure t'
 
@@ -57,11 +60,11 @@ infer (Fix (Var v)) = label "VAR" $ do
         <> show types
 
 -- PI
-infer (Fix (Pi x t e)) = label "PI" $ do
-  _             <- check t (Fix Type)
+infer (Fix (Pi _ t e)) = label "PI" $ do
+  check t (Fix Type)
   (types, vals) <- ask
-  let t'   = nfc vals t
-  let env' = (t' : types, vals)
+  let t'   = nfc types t
+  let env' = (t' : types, t' : vals)
   _ <- local (const env') $ check e (Fix Type)
   pure (Fix Type)
 
@@ -69,30 +72,32 @@ infer (Fix (Pi x t e)) = label "PI" $ do
 infer (Fix (App e e')) = label "APP" $ do
   et <- infer e
   case et of
-    Fix (Pi x t t') -> do
+    Fix p@(Pi _ t _) -> do
       check e' t
-      -- ... I think I've broken it
-      pure $ reduce [t'] e'
-      -- substitute x t' e'
+      let tn = reduce [e'] $ Fix $ App (Fix p) e'
+      pure tn
     t ->
       throw
         $  "expected "
-        <> pretty e
-        <> " to be a Pi type, but was inferred to be "
-        <> pretty t
+        <> pp e
+        <> " to be a Pi type, but was inferred to have type "
+        <> pp t
 
 -- Fallthrough
-infer e = throw $ "could not infer type of " <> pretty e
+infer e = throw $ "could not infer type of " <> pp e
 
 check :: BExpr -> BExpr -> ReaderT Env (Except String) ()
 
 -- LAM
-check (Fix (Lam x e)) (Fix (Pi x' t t')) = label "LAM" $ do
+check (Fix (Lam _ e)) (Fix (Pi _ t t')) = label "LAM" $ do
   (types, vals) <- ask
   check (nfc vals t) (Fix Type)
-  let tn   = nfc types t
+  let tn   = t
   -- Assume (x : t) and add this to the environment when checking (e : t')
   let env' = (tn : types, vals)
+  unsafePerformIO $ putStrLn ("env': " ++ show env') >> pure (pure ())
+  unsafePerformIO $ putStrLn ("e: " ++ pp e) >> pure (pure ())
+  unsafePerformIO $ putStrLn ("t': " ++ pp t') >> pure (pure ())
   _ <- local (const env') $ check e t'
   pure ()
 
@@ -109,11 +114,11 @@ check e t = label "CHK" $ do
     else
       throw
       $  "could not infer that "
-      <> pretty (nfc vals e)
+      <> pp (nfc vals e)
       <> " has type "
-      <> pretty tn
+      <> pp tn
       <> " (inferred type "
-      <> pretty t'
+      <> pp t'
       <> " instead)"
       <> " | vals: "
       <> show vals
