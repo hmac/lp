@@ -1,19 +1,19 @@
 module Parse where
 
-import Prelude hiding (pi)
-import Data.Void
+import           Prelude                 hiding ( pi )
+import           Data.Void
 
-import Text.Megaparsec
-import Text.Megaparsec.Char
+import           Text.Megaparsec
+import           Text.Megaparsec.Char
 
-import Expr
+import           Expr
 
 type Parser = Parsec Void String
 
 runParse :: String -> Either String Expr
 runParse input = case parse expr "" input of
-                   Left e -> Left (errorBundlePretty e)
-                   Right e -> Right e
+  Left  e -> Left (errorBundlePretty e)
+  Right e -> Right e
 
 -- TODO: space consumer
 
@@ -40,20 +40,22 @@ lambda = do
   _ <- string "\\"
   x <- termName
   _ <- string ". " -- space consumer
-  e <- expr
-  pure $ lam x e
+  lam x <$> expr
 
 forall :: Parser Expr
 forall = do
-  _ <- string "forall "
-  (x, t) <- parens $ do
-    name <- termName
-    _ <- string " : " -- space consumer
-    ttype <- expr
-    pure (name, ttype)
-  _ <- string ". " -- space consumer
-  e <- expr
-  pure $ pi x t e
+  _    <- string "forall "
+  vars <- forallVar `sepBy1` string " "
+  _    <- string ". " -- space consumer
+  e    <- expr
+  pure $ foldr (\(x, t) ex -> pi x t ex) e vars
+
+forallVar :: Parser (String, Expr)
+forallVar = parens $ do
+  name  <- termName
+  _     <- string " : " -- space consumer
+  ttype <- expr
+  pure (name, ttype)
 
 pvar :: Parser Expr
 pvar = var <$> termName
