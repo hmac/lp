@@ -73,7 +73,6 @@ natElim m mz ms k = Fix $ NatElim m mz ms k
 
 -- Convert the frontend syntax into the backend syntax, replacing explicit
 -- variable names with De Bruijn indices
--- TODO: recursion scheme
 translate :: Expr -> BExpr
 translate expr = case safeTranslate mempty expr of
   Right e   -> e
@@ -91,6 +90,7 @@ type Context = [(String, Expr)]
 --           and expression \x. \y. x
 --      we pretend to have \a. \b. \e. \f. \x. \y. x
 --      which produces     \   \   \   \   \   \   1
+-- TODO: recursion scheme
 safeTranslate :: Context -> Expr -> Either String BExpr
 safeTranslate context = go (sort (map fst context))
  where

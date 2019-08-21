@@ -13,10 +13,10 @@ instance Pretty (Fix (ExprF String String)) where
     f :: FExprF (Doc ann) -> Doc ann
     f = \case
       Var v             -> pretty v
-      Ann e t           -> e <> " : " <> t
-      App x y           -> x <> " " <> y
-      Lam v e           -> "(\\" <> pretty v <> ". " <> e <> ")"
-      Pi x t e          -> "forall (" <> pretty x <> " : " <> t <> "). " <> e
+      Ann e t           -> e <+> ":" <+> t
+      App x y           -> x <+> y
+      Lam v e           -> "(\\" <> pretty v <> "." <+> e <> ")"
+      Pi x t e          -> "forall (" <> pretty x <+> ":" <+> t <> ")." <+> e
       Type              -> "Type"
       Nat               -> "Nat"
       Zero              -> "Zero"
@@ -29,10 +29,10 @@ instance Pretty (Fix (ExprF () Int)) where
     f :: BExprF (Doc ann) -> Doc ann
     f = \case
       Var i             -> pretty i
-      Ann e t           -> e <> " : " <> t
-      App x y           -> x <> " " <> y
-      Lam _ e           -> "(\\. " <> e <> ")"
-      Pi _ t e          -> "forall (_ : " <> t <> "). " <> e
+      Ann e t           -> e <+> ":" <+> t
+      App x y           -> x <+> y
+      Lam _ e           -> "(\\." <+> e <> ")"
+      Pi _ t e          -> "forall (_ :" <+> t <> "). " <> e
       Type              -> "Type"
       Nat               -> "Nat"
       Zero              -> "Zero"
