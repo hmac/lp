@@ -1,6 +1,8 @@
 module Parse where
 
-import           Prelude                 hiding ( pi )
+import           Prelude                 hiding ( pi
+                                                , product
+                                                )
 import           Data.Void
 
 import           Text.Megaparsec
@@ -18,13 +20,20 @@ runParse input = case parse expr "" input of
 -- TODO: space consumer
 
 expr :: Parser Expr
-expr = try annotation <|> application <|> aexpr
+expr = try annotation <|> try product <|> application <|> aexpr
 
 application :: Parser Expr
 application = foldl1 app <$> (aexpr `sepBy` string " ")
 
 aexpr :: Parser Expr
-aexpr = ptype <|> lambda <|> forall <|> naturals <|> parens expr <|> pvar
+aexpr =
+  ptype
+    <|> lambda
+    <|> forall
+    <|> naturals
+    <|> pProdElim
+    <|> parens expr
+    <|> pvar
 
 annotation :: Parser Expr
 annotation = do
@@ -68,6 +77,19 @@ naturals = pNat <|> pZero <|> pSuc <|> pNatElim
     _              <- string "natElim"
     [m, mz, ms, k] <- sequenceA $ replicate 4 (string " " >> aexpr)
     pure $ natElim m mz ms k
+
+product :: Parser Expr
+product = do
+  a <- aexpr
+  _ <- string "*"
+  prod a <$> aexpr
+
+pProdElim :: Parser Expr
+pProdElim = do
+  _ <- string "prodElim "
+  f <- aexpr
+  _ <- string " "
+  prodElim f <$> aexpr
 
 pvar :: Parser Expr
 pvar = var <$> termName

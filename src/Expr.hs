@@ -24,6 +24,8 @@ data ExprF b x r -- r: inductive type, b: binder type, x: variable type
   | Zero
   | Suc r
   | NatElim r r r r
+  | Prod r r
+  | ProdElim r r
   deriving (Show, Eq, Functor)
 
 $(deriveEq1 ''ExprF)
@@ -70,6 +72,12 @@ suc = Fix . Suc
 
 natElim :: Expr -> Expr -> Expr -> Expr -> Expr
 natElim m mz ms k = Fix $ NatElim m mz ms k
+
+prod :: Expr -> Expr -> Expr
+prod a b = Fix $ Prod a b
+
+prodElim :: Expr -> Expr -> Expr
+prodElim f p = Fix $ ProdElim f p
 
 -- Convert the frontend syntax into the backend syntax, replacing explicit
 -- variable names with De Bruijn indices
@@ -126,7 +134,14 @@ safeTranslate context = go (sort (map fst context))
       ms' <- go ctx ms
       k'  <- go ctx k
       pure $ Fix $ NatElim m' mz' ms' k'
-
+    Fix (Prod a b) -> do
+      a' <- go ctx a
+      b' <- go ctx b
+      pure $ Fix $ Prod a' b'
+    Fix (ProdElim f p) -> do
+      f' <- go ctx f
+      p' <- go ctx p
+      pure $ Fix $ ProdElim f' p'
 
 -- Utilities
 mapSnd :: (b -> c) -> [(a, b)] -> [(a, c)]

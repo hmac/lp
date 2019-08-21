@@ -31,14 +31,18 @@ evalExpr ctx ex = head (reduceList' ex)
     Fix (Pi x t e) ->
       let ctx' = (x, Fix (Var x)) : ctx
       in  Fix (Pi x (reduce' t) (evalExpr ctx' e))
-    Fix Type                            -> Fix Type
-    Fix Nat                             -> Fix Nat
-    Fix Zero                            -> Fix Zero
-    Fix (Suc n                        ) -> Fix $ Suc (reduce' n)
+    Fix Type                            -> type_
+    Fix Nat                             -> nat
+    Fix Zero                            -> zero
+    Fix (Suc n                        ) -> suc (reduce' n)
 
     Fix (NatElim _ mz _  (Fix Zero   )) -> mz
     Fix (NatElim m mz ms (Fix (Suc n))) -> app (app ms n) (natElim m mz ms n)
     Fix (NatElim m mz ms k            ) -> natElim m mz ms (reduce' k)
+
+    Fix (Prod     a b                 ) -> prod (reduce' a) (reduce' b)
+    Fix (ProdElim f (Fix (Prod a b))  ) -> app (app f a) b
+    Fix (ProdElim f p                 ) -> prodElim f (reduce' p)
 
 substitute :: String -> Expr -> Expr -> Expr
 substitute v a b = topDown' alg a
@@ -47,7 +51,7 @@ substitute v a b = topDown' alg a
     Fix (Var v') | v' == v   -> Left b
                  | otherwise -> Left $ Fix (Var v')
     Fix (Lam v' e) | v' == v   -> Left $ Fix (Lam v' e)
-                   | otherwise -> Right $ Fix (Lam v' e) -- TODO
+                   | otherwise -> Right $ Fix (Lam v' e) -- TODO: [remove this comment?]
     Fix (Pi x t e) | x == v    -> Left $ Fix (Pi x t e)
                    | otherwise -> Right $ Fix (Pi x t e)
     e -> Right e

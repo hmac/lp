@@ -33,6 +33,10 @@ main = hspec $ do
     "Zero" ~> zero
     "Suc Zero" ~> suc zero
     "natElim m mz ms k" ~> natElim (var "m") (var "mz") (var "ms") (var "k")
+    "Nat*Nat" ~> prod nat nat
+    "Zero*(Suc Zero)" ~> prod zero (suc zero)
+    "prodElim (\\a b. a) (Zero*Zero)"
+      ~> prodElim (lam "a" (lam "b" (var "a"))) (prod zero zero)
 
   describe "Inference" $ do
     "Type" ~~ type_
@@ -103,6 +107,34 @@ main = hspec $ do
     "natElim ((\\n. Nat) : forall (n : Nat). Type) (Suc Zero) ((\\k n. Suc n) : forall (k : Nat) (n : Nat). Nat) (Suc (Suc Zero))"
       ~~ nat
 
+    -- Product
+    "Type*Type" ~~ type_
+    "Nat*Nat" ~~ type_
+    "Zero*Zero" ~~ prod nat nat
+    "Zero*Type" ~~ prod nat type_
+    "Zero*(Zero*Zero)" ~~ prod nat (prod nat nat)
+    "prodElim ((\\a b. a) : forall (a : Nat) (b : Nat). Nat) (Zero*Zero)" ~~ nat
+    "prodElim ((\\a b. b) : forall (a : Nat) (b : Type). Type) (Zero*Nat)"
+      ~~ type_
+    -- uncurry
+    "(\\a b c f p. prodElim f p) : forall (a : Type) (b : Type) (c : Type) (f : forall (x : a) (y : b). c) (p : a*b). c"
+      ~~ pi
+           "a"
+           type_
+           (pi
+             "b"
+             type_
+             (pi
+               "c"
+               type_
+               (pi "f"
+                   (pi "x" (var "a") (pi "y" (var "b") (var "c")))
+                   (pi "p" (prod (var "a") (var "b")) (var "c"))
+               )
+             )
+           )
+
+    -- Rejections
     -- unannotated lambdas are forbidden
     illTyped "\\x. x"
     -- function types must end with a type, not a value (I think)
@@ -113,6 +145,10 @@ main = hspec $ do
     -- function application that applies x to f instead of f to x
     illTyped
       "(\\a b f x. x f) : forall (a : Type) (b : Type) (f : forall (x : a). b) (x : a). b"
+    illTyped
+      "prodElim ((\\a b. a) : forall (a : Nat) (b : Nat). Nat) (Zero*Nat)"
+    illTyped
+      "prodElim ((\\a b. b) : forall (a : Nat) (b : Type). Nat) (Zero*Nat)"
 
   describe "Evaluation" $ do
     "((\\t x. x) : forall (t : Type) (x : t). t) Type Type" ~* "Type"
@@ -131,7 +167,13 @@ main = hspec $ do
     -- Nat increment
     "natElim ((\\n. Nat) : forall (n : Nat). Type) (Suc Zero) ((\\k n. Suc n) : forall (k : Nat) (n : Nat). Nat) (Suc (Suc Zero))"
       ~* "Suc (Suc (Suc Zero))"
-
+    "prodElim ((\\a b. a) : forall (a : Nat) (b : Nat). Nat) (Zero*Zero)"
+      ~* "Zero"
+    "prodElim ((\\a b. b) : forall (a : Nat) (b : Type). Type) (Zero*Nat)"
+      ~* "Nat"
+    -- uncurry const Zero (Suc Zero) (== fst (Zero, Suc Zero))
+    "((\\a b c f p. prodElim f p) : forall (a : Type) (b : Type) (c : Type) (f : forall (x : a) (y : b). c) (p : a*b). c) Nat Nat Nat ((\\x y. x) : forall (x : Nat) (y : Nat). Nat) (Zero*(Suc Zero))"
+      ~* "Zero"
 
 -- Expect parse
 (~>) :: String -> Expr -> Spec
