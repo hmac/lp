@@ -24,6 +24,7 @@ main = hspec $ do
     "\\x. x" ~> lam "x" (var "x")
     "forall (x : Type). x" ~> pi "x" type_ (var "x")
     "(\\x. x) y" ~> app (lam "x" (var "x")) (var "y")
+    "(\\x y. x) z" ~> app (lam "x" (lam "y" (var "x"))) (var "z")
     "x : Type" ~> ann (var "x") type_
     "((\\x. x) : forall (x : Type). Type) Type"
       ~> app (ann (lam "x" (var "x")) (pi "x" type_ type_)) type_
@@ -33,20 +34,20 @@ main = hspec $ do
     "Type" ~~ type_
     "(\\t. t) : forall (t : Type). Type" ~~ pi "t" type_ type_
     -- id
-    "(\\t. (\\x. x)) : forall (t : Type) (x : t). t"
+    "(\\t x. x) : forall (t : Type) (x : t). t"
       ~~ pi "t" type_ (pi "x" (var "t") (var "t"))
     -- const
-    "(\\t1. \\x. \\t2. \\y. x) : forall (t1 : Type) (x : t1) (t2 : Type) (y : t2). t1"
+    "(\\t1 x t2 y. x) : forall (t1 : Type) (x : t1) (t2 : Type) (y : t2). t1"
       ~~ pi "t1"
             type_
             (pi "x" (var "t1") (pi "t2" type_ (pi "y" (var "t2") (var "t1"))))
     -- (Type -> Type) Type
     "((\\t. t) : forall (t : Type). Type) Type" ~~ type_
     -- id Type Type
-    "((\\t. \\x. x) : forall (t : Type) (x : t). t) Type Type" ~~ type_
+    "((\\t x. x) : forall (t : Type) (x : t). t) Type Type" ~~ type_
 
     -- function application
-    "(\\a. \\b. \\f. \\x. f x) : forall (a : Type) (b : Type) (f : forall (x : a). b) (x : a). b"
+    "(\\a b f x. f x) : forall (a : Type) (b : Type) (f : forall (x : a). b) (x : a). b"
       ~~ pi
            "a"
            type_
@@ -57,7 +58,7 @@ main = hspec $ do
            )
 
     -- S combinator specialised to a single type
-    "(\\a. \\x. \\y. \\z. x z (y z)) : forall (a : Type) (x : forall (z : a) (yz : a). a) (y : forall (z : a). a) (z : a). a"
+    "(\\a x y z. x z (y z)) : forall (a : Type) (x : forall (z : a) (yz : a). a) (y : forall (z : a). a) (z : a). a"
       ~~ pi
            "a"
            type_
@@ -68,7 +69,7 @@ main = hspec $ do
            )
 
     -- S combinator generalised over several types
-    "(\\a. \\b. \\c. \\x. \\y. \\z. x z (y z)) : forall (a : Type) (b : Type) (c : Type) (x : forall (z : a) (yz : b). c) (y : forall (z : a). b) (z : a). c"
+    "(\\a b c x y z. x z (y z)) : forall (a : Type) (b : Type) (c : Type) (x : forall (z : a) (yz : b). c) (y : forall (z : a). b) (z : a). c"
       ~~ pi
            "a"
            type_
@@ -94,20 +95,19 @@ main = hspec $ do
     -- function types must end with a type, not a value (I think)
     illTyped "\\x. x : forall (x : Type). x"
     -- const that returns the wrong argument
-    illTyped
-      "(\\a. \\x. \\b. \\y. y) : forall (a : Type) (x : a) (b : Type) (y : b). a"
-    illTyped "(\\a. \\b. a) : forall (a : Type). Type"
+    illTyped "(\\a x b y. y) : forall (a : Type) (x : a) (b : Type) (y : b). a"
+    illTyped "(\\a b. a) : forall (a : Type). Type"
     -- function application that applies x to f instead of f to x
     illTyped
-      "(\\a. \\b. \\f. \\x. x f) : forall (a : Type) (b : Type) (f : forall (x : a). b) (x : a). b"
+      "(\\a b f x. x f) : forall (a : Type) (b : Type) (f : forall (x : a). b) (x : a). b"
 
   describe "Evaluation" $ do
-    "((\\t. \\x. x) : forall (t : Type) (x : t). t) Type Type" ~* "Type"
-    "((\\a. \\b. \\x. x) : forall (a : Type) (b : Type) (x : b). b) Type Type Type"
+    "((\\t x. x) : forall (t : Type) (x : t). t) Type Type" ~* "Type"
+    "((\\a b x. x) : forall (a : Type) (b : Type) (x : b). b) Type Type Type"
       ~* "Type"
-    "((\\a. \\b. \\f. \\x. f x) : forall (a : Type) (b : Type) (f : forall (x : a). b) (x : a). b) Type Type ((\\x. x) : forall (x : Type). Type) Type"
+    "((\\a b f x. f x) : forall (a : Type) (b : Type) (f : forall (x : a). b) (x : a). b) Type Type ((\\x. x) : forall (x : Type). Type) Type"
       ~* "Type"
-    "((\\a. \\b. \\c. \\x. \\y. \\z. x z (y z)) : forall (a : Type) (b : Type) (c : Type) (x : forall (z : a) (yz : b). c) (y : forall (z : a). b) (z : a). c) Type Type Type ((\\x. \\yz. Type) : forall (x : Type) (yz : Type). Type) ((\\z. z) : forall (z : Type). Type) Type"
+    "((\\a b c x y z. x z (y z)) : forall (a : Type) (b : Type) (c : Type) (x : forall (z : a) (yz : b). c) (y : forall (z : a). b) (z : a). c) Type Type Type ((\\x. \\yz. Type) : forall (x : Type) (yz : Type). Type) ((\\z. z) : forall (z : Type). Type) Type"
       ~* "Type"
 
 

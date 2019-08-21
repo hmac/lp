@@ -37,10 +37,11 @@ ptype = string "Type" >> pure type_
 
 lambda :: Parser Expr
 lambda = do
-  _ <- string "\\"
-  x <- termName
-  _ <- string ". " -- space consumer
-  lam x <$> expr
+  _  <- string "\\"
+  xs <- termName `sepBy1` string " "
+  _  <- string ". " -- space consumer
+  e  <- expr
+  pure $ foldr lam e xs
 
 forall :: Parser Expr
 forall = do
