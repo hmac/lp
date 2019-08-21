@@ -133,6 +133,16 @@ main = hspec $ do
                )
              )
            )
+    -- fst
+    "(\\a b p. prodElim ((\\x y. x) : forall (x : a) (y : b). a) p) : forall (a : Type) (b : Type) (p : a*b). a"
+      ~~ pi "a"
+            type_
+            (pi "b" type_ (pi "p" (prod (var "a") (var "b")) (var "a")))
+    -- snd
+    "(\\a b p. prodElim ((\\x y. y) : forall (x : a) (y : b). b) p) : forall (a : Type) (b : Type) (p : a*b). b"
+      ~~ pi "a"
+            type_
+            (pi "b" type_ (pi "p" (prod (var "a") (var "b")) (var "b")))
 
     -- Rejections
     -- unannotated lambdas are forbidden

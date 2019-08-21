@@ -30,6 +30,7 @@ check_ e t = step (check e t)
 
 infer_ :: Expr -> ReaderT Env (Except String) Expr
 infer_ e = step (infer e)
+
 step :: Monad m => ReaderT Env m a -> ReaderT Env m a
 step f = do
   (types, vals, depth) <- ask
@@ -49,17 +50,15 @@ spy f = do
   pure x
 
 type Context = [(String, Expr)]
-type Env = (Context, Context, Depth) -- (types, values)
--- TODO: should we have a single environment containing both types and values?
+type Env = (Context, Context, Depth) -- (types, values, stack depth)
 
 -- A helper to let us annotate errors with their source
-infixr 5 <?>
-(<?>)
-  :: ReaderT Env (Except String) a -> String -> ReaderT Env (Except String) a
-e <?> s = let f err = err <> " [" <> s <> "]" in mapReaderT (withExceptT f) e
 label
   :: String -> ReaderT Env (Except String) a -> ReaderT Env (Except String) a
 label = flip (<?>)
+ where
+  e <?> s =
+    let f err = err <> " [" <> s <> "]" in mapReaderT (withExceptT f) e
 
 runInfer :: Env -> Expr -> Either String Expr
 runInfer env expr = runExcept (runReaderT (infer expr) env)
@@ -103,9 +102,6 @@ infer (Fix (Pi x t e)) = label "PI" $ do
   check_ t (Fix Type)
   (types, vals, d) <- ask
   let t'   = evalExpr vals t
-  -- TODO: add (x : t) to vals as well?
-  -- maybe we only add to vals when inferring an application?
-  -- what about inferring the body of a lambda?
   let env' = ((x, t') : types, vals, d)
   _ <- local (const env') $ check_ e (Fix Type)
   spy $ pure (Fix Type)
