@@ -3,7 +3,6 @@ module Tutorial.Expr where
 import           Data.Text.Prettyprint.Doc      ( pretty
                                                 , (<+>)
                                                 , Pretty
-                                                , parens
                                                 )
 
 data TermI = Ann TermC TermC

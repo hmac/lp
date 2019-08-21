@@ -1,10 +1,10 @@
 name:                lp
 version:             0.1.0.0
-github:              "githubuser/lp"
+github:              "hmac/lp"
 license:             BSD3
-author:              "Author name here"
-maintainer:          "example@example.com"
-copyright:           "2019 Author name here"
+author:              "Harry Maclean"
+maintainer:          "harryjmaclean@gmail.com"
+copyright:           "2019 Harry Maclean"
 
 extra-source-files:
 - README.md

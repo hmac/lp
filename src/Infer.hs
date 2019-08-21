@@ -1,5 +1,9 @@
+{-# LANGUAGE DerivingVia #-}
 module Infer where
 
+import           Data.Monoid                    ( Sum(..)
+                                                , Monoid
+                                                )
 import           Data.Functor.Foldable
 import           Control.Monad.Trans.Reader
 import           Control.Monad.Trans.Except
@@ -8,50 +12,83 @@ import           Control.Monad.Trans.Class      ( lift
                                                 )
 
 import           Expr                    hiding ( Context )
-import           Expr.Pretty -- to import orphan Pretty instances for Expr
+-- to import orphan Pretty instances for Expr
+import           Expr.Pretty                    ( )
 import           Eval                           ( nfc
                                                 , reduce
+                                                , evalExpr
                                                 )
 import           Pretty
 
 import           System.IO.Unsafe               ( unsafePerformIO )
 
-type Context = [BExpr]
-type Env = (Context, Context) -- (types, values)
--- TODO: should we have a single environment containing both types and terms?
+-- so we can still use mempty for Env
+newtype Depth = Depth Int deriving (Semigroup, Monoid) via (Sum Int)
+                          deriving Show
+                          deriving Num via Int
+
+check_ e t = step (check e t)
+infer_ e = step (infer e)
+step :: Monad m => ReaderT Env m a -> ReaderT Env m a
+step f = do
+  (types, vals, depth) <- ask
+  local (const (types, vals, depth + 1)) f
+
+trace :: Monad m => String -> ReaderT Env m ()
+trace msg = do
+  (_, _, Depth depth) <- ask
+  let prefix = replicate (depth * 2) '-'
+      msg'   = prefix ++ msg
+  unsafePerformIO $ putStrLn msg' >> pure (pure ())
+
+spy :: Monad m => ReaderT Env m Expr -> ReaderT Env m Expr
+spy f = do
+  x <- f
+  trace $ "[" ++ pp x ++ "]"
+  pure x
+
+type Context = [(String, Expr)]
+type Env = (Context, Context, Depth) -- (types, values)
+-- TODO: should we have a single environment containing both types and values?
 
 -- A helper to let us annotate errors with their source
 infixr 5 <?>
 (<?>)
   :: ReaderT Env (Except String) a -> String -> ReaderT Env (Except String) a
-e <?> s = let f err = err <> " " <> s in mapReaderT (withExceptT f) e
-
+e <?> s = let f err = err <> " [" <> s <> "]" in mapReaderT (withExceptT f) e
 label
   :: String -> ReaderT Env (Except String) a -> ReaderT Env (Except String) a
 label = flip (<?>)
 
-runInfer :: Env -> BExpr -> Either String BExpr
+runInfer :: Env -> Expr -> Either String Expr
 runInfer env expr = runExcept (runReaderT (infer expr) env)
 
+-- for debugging
+runCheck :: Env -> Expr -> Expr -> Either String ()
+runCheck env expr t = runExcept (runReaderT (check expr t) env)
+
 -- TODO: use a custom error type instead of string, to include context
-infer :: BExpr -> ReaderT Env (Except String) BExpr
+infer :: Expr -> ReaderT Env (Except String) Expr
 
 -- ANN
 infer (Fix (Ann e t)) = label "ANN" $ do
-  check t (Fix Type)
-  (types, _vals) <- ask
-  let t' = nfc types t
-  check e t'
-  pure t'
+  trace "ANN"
+  check_ t (Fix Type)
+  (types, vals, _) <- ask
+  let t' = evalExpr vals t
+  trace $ "t: " ++ pp t'
+  check_ e t'
+  spy $ pure t'
 
 -- TYPE
 infer (Fix Type   ) = pure (Fix Type)
 
 -- VAR
 infer (Fix (Var v)) = label "VAR" $ do
-  (types, _) <- ask
-  case safeIndex v types of
-    Just t -> pure t
+  trace $ "VAR (" ++ v ++ ")"
+  (types, _, _) <- ask
+  case lookup v types of
+    Just t -> spy $ pure t
     Nothing ->
       throw
         $  "could not determine type of variable "
@@ -60,76 +97,120 @@ infer (Fix (Var v)) = label "VAR" $ do
         <> show types
 
 -- PI
-infer (Fix (Pi _ t e)) = label "PI" $ do
-  check t (Fix Type)
-  (types, vals) <- ask
-  let t'   = nfc types t
-  let env' = (t' : types, t' : vals)
-  _ <- local (const env') $ check e (Fix Type)
-  pure (Fix Type)
+infer (Fix (Pi x t e)) = label "PI" $ do
+  trace "PI"
+  check_ t (Fix Type)
+  (types, vals, d) <- ask
+  let t'   = evalExpr vals t
+  -- TODO: add (x : t) to vals as well?
+  -- maybe we only add to vals when inferring an application?
+  -- what about inferring the body of a lambda?
+  let env' = ((x, t') : types, vals, d)
+  _ <- local (const env') $ check_ e (Fix Type)
+  spy $ pure (Fix Type)
 
 -- APP
 infer (Fix (App e e')) = label "APP" $ do
-  et <- infer e
-  case et of
-    Fix p@(Pi _ t _) -> do
-      check e' t
-      let tn = reduce [e'] $ Fix $ App (Fix p) e'
-      pure tn
+  trace $ "APP " ++ pp (Fix (App e e'))
+  (types, vals, _) <- ask
+  e_type           <- infer_ e
+  trace $ "e: " ++ pp e
+  trace $ "e': " ++ pp e'
+  trace $ "e_type: " ++ pp e_type
+  case e_type of
+    Fix (Pi x t t') -> do
+      check_ e' t
+      let t'n = evalExpr ((x, e') : vals) t'
+      trace $ x ++ " = " ++ pp e'
+      trace $ "t': " ++ pp t'
+      trace $ "t'n: " ++ pp t'n
+      trace $ "types: " ++ show types
+      trace $ "vals: " ++ show vals
+      spy $ pure t'n
     t ->
       throw
         $  "expected "
         <> pp e
         <> " to be a Pi type, but was inferred to have type "
         <> pp t
+        <> " ( "
+        <> show (evalExpr vals e)
+        <> " )"
 
 -- Fallthrough
 infer e = throw $ "could not infer type of " <> pp e
 
-check :: BExpr -> BExpr -> ReaderT Env (Except String) ()
+check :: Expr -> Expr -> ReaderT Env (Except String) ()
+
+-- Short-circuit for the most common use of check
+check (Fix Type     ) (Fix Type        ) = pure ()
 
 -- LAM
-check (Fix (Lam _ e)) (Fix (Pi _ t t')) = label "LAM" $ do
-  (types, vals) <- ask
-  check (nfc vals t) (Fix Type)
-  let tn   = t
-  -- Assume (x : t) and add this to the environment when checking (e : t')
-  let env' = (tn : types, vals)
-  unsafePerformIO $ putStrLn ("env': " ++ show env') >> pure (pure ())
-  unsafePerformIO $ putStrLn ("e: " ++ pp e) >> pure (pure ())
-  unsafePerformIO $ putStrLn ("t': " ++ pp t') >> pure (pure ())
-  _ <- local (const env') $ check e t'
+check (Fix (Lam x e)) (Fix (Pi x' t t')) = label "LAM" $ do
+  trace $ "LAM " ++ pp (Fix (Lam x e)) ++ " : " ++ pp (Fix (Pi x' t t'))
+  (types, vals, d) <- ask
+  check_ (evalExpr vals t) (Fix Type)
+  -- Assume (x : t) and (x' : t) and add this to the environment when checking (e : t')
+  let env' = ((x, t) : (x', t) : types, vals, d)
+  trace $ "env': " ++ show env'
+  -- trace $ "e: " ++ pp e
+  -- trace $ "t': " ++ pp t'
+  _ <- local (const env') $ check_ e t'
   pure ()
 
 -- 𝚪 ⊢ e :↑ t
 ------------- (CHK)
 -- 𝚪 ⊢ e :↓ t
+--
+-- To compare two types, we first evaluate them as much as possible, then
+-- convert them to BExprs (de Bruijn indexed) and directly compare them for
+-- structural equality.
+-- This means we can ignore differences in variable names.
+-- TODO: does this still work if we have free variables in the mix?
 check e t = label "CHK" $ do
   env <- ask
-  let (types, vals) = env
-  t' <- nfc types <$> infer e
-  let tn = nfc types t
-  if t' == tn
-    then pure ()
-    else
-      throw
-      $  "could not infer that "
-      <> pp (nfc vals e)
-      <> " has type "
-      <> pp tn
-      <> " (inferred type "
-      <> pp t'
-      <> " instead)"
-      <> " | vals: "
-      <> show vals
-      <> " | types: "
-      <> show types
-      <> " | env: "
-      <> show env
-      <> " | t': "
-      <> show t'
-      <> " | tn: "
-      <> show tn
+  trace $ "CHK " ++ pp e ++ " : " ++ pp t
+  let (types, vals, _) = env
+  t' <- evalExpr vals <$> infer_ e
+  let tn  = evalExpr [] t
+      t'b = safeTranslate types t'
+      tnb = safeTranslate types tn
+  trace $ "types: " ++ show types
+  trace $ "vals: " ++ show vals
+  trace $ "t: " ++ pp t
+  trace $ "t': " ++ pp t'
+  trace $ "tn: " ++ pp tn
+  case t'b of
+    Left  err -> throw $ err ++ " (when translating " ++ pp t' ++ ")"
+    Right t'b -> case tnb of
+      Left  err -> throw $ err ++ " (when translating " ++ pp tn ++ ")"
+      Right tnb -> do
+        trace $ "t: " ++ pp t
+        trace $ "t': " ++ pp t'
+        trace $ "tn: " ++ pp tn
+        trace $ "t'b: " ++ pp t'b
+        trace $ "tnb: " ++ pp tnb
+        if t'b == tnb
+          then pure ()
+          else
+            throw
+            $  "could not infer that "
+            <> pp (evalExpr vals e)
+            <> " has type "
+            <> pp tnb
+            <> " (inferred type "
+            <> pp t'b
+            <> " instead)"
+            <> " | vals: "
+            <> show vals
+            <> " | types: "
+            <> show types
+            <> " | env: "
+            <> show env
+            <> " | t': "
+            <> show t'b
+            <> " | tn: "
+            <> show tnb
 
 -- Convenience function for throwing type errors
 throw :: (Monad m, MonadTrans t) => e -> t (ExceptT e m) a
