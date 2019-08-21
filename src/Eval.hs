@@ -28,7 +28,14 @@ evalExpr ctx ex = head (reduceList' ex)
     Fix (Pi x t e) ->
       let ctx' = (x, Fix (Var x)) : ctx
       in  Fix (Pi x (reduce' t) (evalExpr ctx' e))
-    Fix Type -> Fix Type
+    Fix Type                            -> Fix Type
+    Fix Nat                             -> Fix Nat
+    Fix Zero                            -> Fix Zero
+    Fix (Suc n                        ) -> Fix $ Suc (reduce' n)
+
+    Fix (NatElim _ mz _  (Fix Zero   )) -> mz
+    Fix (NatElim m mz ms (Fix (Suc n))) -> app (app ms n) (natElim m mz ms n)
+    Fix (NatElim m mz ms k            ) -> natElim m mz ms (reduce' k)
 
 type Context = [BExpr]
 
@@ -48,15 +55,22 @@ reduceList ctx expr = go [expr]
 -- TODO: what about reducing applications of (Pi ...) x ?
 reduce :: Context -> BExpr -> BExpr
 reduce ctx (Fix expr) = case expr of
-  App (Fix l@Lam{}  ) b -> breduce (Fix l) b
-  App (Fix p@Pi{}   ) b -> breduce (Fix p) b
-  App (Fix (Ann e _)) b -> reduce ctx (Fix (App e b))
-  App a               b -> Fix $ App (reduce ctx a) (reduce ctx b)
-  Lam v               e -> Fix $ Lam v (reduce ctx e)
-  Var i                 -> fromMaybe (Fix (Var i)) (safeIndex i ctx)
-  Ann e t               -> Fix $ Ann (reduce ctx e) (reduce ctx t)
-  Pi x t e              -> Fix $ Pi x (reduce ctx t) (reduce ctx e)
-  Type                  -> Fix Type
+  App (Fix l@Lam{}  ) b     -> breduce (Fix l) b
+  App (Fix p@Pi{}   ) b     -> breduce (Fix p) b
+  App (Fix (Ann e _)) b     -> reduce ctx (Fix (App e b))
+  App a               b     -> Fix $ App (reduce ctx a) (reduce ctx b)
+  Lam v               e     -> Fix $ Lam v (reduce ctx e)
+  Var i                     -> fromMaybe (Fix (Var i)) (safeIndex i ctx)
+  Ann e t                   -> Fix $ Ann (reduce ctx e) (reduce ctx t)
+  Pi x t e                  -> Fix $ Pi x (reduce ctx t) (reduce ctx e)
+  Type                      -> Fix Type
+  Nat                       -> Fix Nat
+  Zero                      -> Fix Zero
+  Suc n                     -> Fix (Suc (reduce ctx n))
+  NatElim _ mz _ (Fix Zero) -> mz
+  NatElim m mz ms (Fix (Suc n)) ->
+    Fix $ App (Fix (App ms n)) (Fix (NatElim m mz ms n))
+  NatElim m mz ms k -> Fix $ NatElim m mz ms (reduce ctx k)
 
 -- TODO: this is so messy and complex - surely we can simplify it
 breduce :: BExpr -> BExpr -> BExpr
@@ -77,6 +91,14 @@ sub b i (Pi x (Fix t) (Fix e))  = Pi x (Fix (sub b i t)) (Fix (sub b (i + 1) e))
 sub _ _ Type                    = Type
 sub b i (Ann (Fix e ) (Fix t )) = Ann (Fix (sub b i e)) (Fix (sub b i t))
 sub b i (App (Fix e1) (Fix e2)) = App (Fix (sub b i e1)) (Fix (sub b i e2))
+sub _ _ Nat                     = Nat
+sub _ _ Zero                    = Zero
+sub b i (Suc (Fix n))           = Suc (Fix (sub b i n))
+sub b i (NatElim (Fix m) (Fix mz) (Fix ms) (Fix k)) = NatElim
+  (Fix (sub b i m))
+  (Fix (sub b i mz))
+  (Fix (sub b i ms))
+  (Fix (sub b i k))
 
 decFree :: ExprF () Int BExpr -> ExprF () Int BExpr
 decFree = go 0
@@ -88,6 +110,11 @@ decFree = go 0
   go _ Type                   = Type
   go i (Ann (Fix e) (Fix t))  = Ann (Fix (go i e)) (Fix (go i t))
   go i (App (Fix a) (Fix b))  = App (Fix (go i a)) (Fix (go i b))
+  go _ Nat                    = Nat
+  go _ Zero                   = Zero
+  go i (Suc (Fix n))          = Suc (Fix (go i n))
+  go i (NatElim (Fix m) (Fix mz) (Fix ms) (Fix k)) =
+    let r = Fix . go i in NatElim (r m) (r mz) (r ms) (r k)
 
 substitute :: String -> Expr -> Expr -> Expr
 substitute v a b = topDown' alg a

@@ -29,6 +29,10 @@ main = hspec $ do
     "((\\x. x) : forall (x : Type). Type) Type"
       ~> app (ann (lam "x" (var "x")) (pi "x" type_ type_)) type_
     "forall (x : Type) (y : Type). x" ~> pi "x" type_ (pi "y" type_ (var "x"))
+    "Nat" ~> nat
+    "Zero" ~> zero
+    "Suc Zero" ~> suc zero
+    "natElim m mz ms k" ~> natElim (var "m") (var "mz") (var "ms") (var "k")
 
   describe "Inference" $ do
     "Type" ~~ type_
@@ -90,6 +94,15 @@ main = hspec $ do
              )
            )
 
+    -- Nats
+    "Nat" ~~ type_
+    "Zero" ~~ nat
+    "Suc Zero" ~~ nat
+    "natElim ((\\n. Nat) : forall (n : Nat). Type) Zero ((\\k n. n) : forall (k : Nat) (n : Nat). Nat) (Suc Zero)"
+      ~~ nat
+    "natElim ((\\n. Nat) : forall (n : Nat). Type) (Suc Zero) ((\\k n. Suc n) : forall (k : Nat) (n : Nat). Nat) (Suc (Suc Zero))"
+      ~~ nat
+
     -- unannotated lambdas are forbidden
     illTyped "\\x. x"
     -- function types must end with a type, not a value (I think)
@@ -109,6 +122,15 @@ main = hspec $ do
       ~* "Type"
     "((\\a b c x y z. x z (y z)) : forall (a : Type) (b : Type) (c : Type) (x : forall (z : a) (yz : b). c) (y : forall (z : a). b) (z : a). c) Type Type Type ((\\x. \\yz. Type) : forall (x : Type) (yz : Type). Type) ((\\z. z) : forall (z : Type). Type) Type"
       ~* "Type"
+    "Nat" ~* "Nat"
+    "Zero" ~* "Zero"
+    "Suc Zero" ~* "Suc Zero"
+    -- const Zero
+    "natElim ((\\n. Nat) : forall (n : Nat). Type) Zero ((\\k n. n) : forall (k : Nat) (n : Nat). Nat) (Suc Zero)"
+      ~* "Zero"
+    -- Nat increment
+    "natElim ((\\n. Nat) : forall (n : Nat). Type) (Suc Zero) ((\\k n. Suc n) : forall (k : Nat) (n : Nat). Nat) (Suc (Suc Zero))"
+      ~* "Suc (Suc (Suc Zero))"
 
 
 -- Expect parse

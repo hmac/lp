@@ -24,7 +24,7 @@ application :: Parser Expr
 application = foldl1 app <$> (aexpr `sepBy` string " ")
 
 aexpr :: Parser Expr
-aexpr = ptype <|> lambda <|> forall <|> parens expr <|> pvar
+aexpr = ptype <|> lambda <|> forall <|> naturals <|> parens expr <|> pvar
 
 annotation :: Parser Expr
 annotation = do
@@ -57,6 +57,17 @@ forallVar = parens $ do
   _     <- string " : " -- space consumer
   ttype <- expr
   pure (name, ttype)
+
+naturals :: Parser Expr
+naturals = pNat <|> pZero <|> pSuc <|> pNatElim
+ where
+  pNat     = string "Nat" >> pure nat
+  pZero    = string "Zero" >> pure zero
+  pSuc     = string "Suc " >> suc <$> aexpr
+  pNatElim = do
+    _              <- string "natElim"
+    [m, mz, ms, k] <- sequenceA $ replicate 4 (string " " >> aexpr)
+    pure $ natElim m mz ms k
 
 pvar :: Parser Expr
 pvar = var <$> termName

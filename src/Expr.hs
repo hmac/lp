@@ -20,6 +20,10 @@ data ExprF b x r -- r: inductive type, b: binder type, x: variable type
   | Lam b r
   | Pi b r r
   | Type
+  | Nat
+  | Zero
+  | Suc r
+  | NatElim r r r r
   deriving (Show, Eq, Functor)
 
 $(deriveEq1 ''ExprF)
@@ -55,6 +59,18 @@ pi s t e = Fix (Pi s t e)
 type_ :: Expr
 type_ = Fix Type
 
+nat :: Expr
+nat = Fix Nat
+
+zero :: Expr
+zero = Fix Zero
+
+suc :: Expr -> Expr
+suc = Fix . Suc
+
+natElim :: Expr -> Expr -> Expr -> Expr -> Expr
+natElim m mz ms k = Fix $ NatElim m mz ms k
+
 -- Convert the frontend syntax into the backend syntax, replacing explicit
 -- variable names with De Bruijn indices
 -- TODO: recursion scheme
@@ -76,7 +92,7 @@ type Context = [(String, Expr)]
 --      we pretend to have \a. \b. \e. \f. \x. \y. x
 --      which produces     \   \   \   \   \   \   1
 safeTranslate :: Context -> Expr -> Either String BExpr
-safeTranslate ctx = go (sort (map fst ctx))
+safeTranslate context = go (sort (map fst context))
  where
   go :: [String] -> Expr -> Either String BExpr
   go ctx = \case
@@ -98,7 +114,18 @@ safeTranslate ctx = go (sort (map fst ctx))
       t' <- go ctx t
       e' <- go (x : ctx) e
       pure $ Fix $ Pi () t' e'
-    Fix Type -> pure $ Fix Type
+    Fix Type    -> pure $ Fix Type
+    Fix Nat     -> pure $ Fix Nat
+    Fix Zero    -> pure $ Fix Zero
+    Fix (Suc e) -> do
+      e' <- go ctx e
+      pure $ Fix $ Suc e'
+    Fix (NatElim m mz ms k) -> do
+      m'  <- go ctx m
+      mz' <- go ctx mz
+      ms' <- go ctx ms
+      k'  <- go ctx k
+      pure $ Fix $ NatElim m' mz' ms' k'
 
 
 -- Utilities

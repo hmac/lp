@@ -1,6 +1,7 @@
 {-# LANGUAGE DerivingVia #-}
 module Infer where
 
+import           Prelude                 hiding ( pi )
 import           Data.Monoid                    ( Sum(..)
                                                 , Monoid
                                                 )
@@ -14,10 +15,7 @@ import           Control.Monad.Trans.Class      ( lift
 import           Expr                    hiding ( Context )
 -- to import orphan Pretty instances for Expr
 import           Expr.Pretty                    ( )
-import           Eval                           ( nfc
-                                                , reduce
-                                                , evalExpr
-                                                )
+import           Eval                           ( evalExpr )
 import           Pretty
 
 import           System.IO.Unsafe               ( unsafePerformIO )
@@ -27,7 +25,10 @@ newtype Depth = Depth Int deriving (Semigroup, Monoid) via (Sum Int)
                           deriving Show
                           deriving Num via Int
 
+check_ :: Expr -> Expr -> ReaderT Env (Except String) ()
 check_ e t = step (check e t)
+
+infer_ :: Expr -> ReaderT Env (Except String) Expr
 infer_ e = step (infer e)
 step :: Monad m => ReaderT Env m a -> ReaderT Env m a
 step f = do
@@ -74,7 +75,7 @@ infer :: Expr -> ReaderT Env (Except String) Expr
 infer (Fix (Ann e t)) = label "ANN" $ do
   trace "ANN"
   check_ t (Fix Type)
-  (types, vals, _) <- ask
+  (_types, vals, _) <- ask
   let t' = evalExpr vals t
   trace $ "t: " ++ pp t'
   check_ e t'
@@ -137,6 +138,23 @@ infer (Fix (App e e')) = label "APP" $ do
         <> show (evalExpr vals e)
         <> " )"
 
+-- Nat
+infer (Fix Nat    ) = pure type_
+infer (Fix Zero   ) = pure nat
+infer (Fix (Suc n)) = label "SUC" $ do
+  check_ n nat
+  pure nat
+infer (Fix (NatElim m mz ms k)) = label "NATELIM" $ do
+  check_ m (pi "_" nat type_)
+  (_, vals, _) <- ask
+  let t = evalExpr vals (app m zero)
+  check_ mz t
+  let t' = evalExpr vals
+        $ pi "l" nat (pi "_" (app m (var "l")) (app m (suc (var "l"))))
+  check_ ms t'
+  check_ k  nat
+  pure $ evalExpr vals (app m k)
+
 -- Fallthrough
 infer e = throw $ "could not infer type of " <> pp e
 
@@ -166,7 +184,6 @@ check (Fix (Lam x e)) (Fix (Pi x' t t')) = label "LAM" $ do
 -- convert them to BExprs (de Bruijn indexed) and directly compare them for
 -- structural equality.
 -- This means we can ignore differences in variable names.
--- TODO: does this still work if we have free variables in the mix?
 check e t = label "CHK" $ do
   env <- ask
   trace $ "CHK " ++ pp e ++ " : " ++ pp t
