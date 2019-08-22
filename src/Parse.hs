@@ -13,10 +13,28 @@ import           Expr
 
 type Parser = Parsec Void String
 
+data Definition = Def String Expr
+
 runParse :: String -> Either String Expr
 runParse input = case parse expr "" input of
   Left  e -> Left (errorBundlePretty e)
   Right e -> Right e
+
+runParseDefs :: String -> Either String [Definition]
+runParseDefs input = case parse program "" input of
+  Left  e -> Left (errorBundlePretty e)
+  Right e -> Right e
+  where program = some (definition <* many eol) <* eof
+
+definition :: Parser Definition
+definition = do
+  name    <- termName
+  _       <- string " : "
+  typeAnn <- expr
+  _       <- string "\n"
+  _       <- string (name ++ " = ")
+  e       <- expr
+  pure $ Def name (ann e typeAnn)
 
 -- TODO: space consumer
 

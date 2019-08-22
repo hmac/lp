@@ -1,62 +1,52 @@
 module Main where
 
-import           Tutorial.Expr
-import           Tutorial.Quote                 ( quote0 )
-import           Tutorial.Parse                 ( runParse
-                                                , convert
-                                                , Expr
+import           Expr
+import           Expr.Pretty                    ( )
+import           Infer                          ( runInfer )
+import           Parse                          ( runParse
+                                                , runParseDefs
+                                                , Definition(..)
                                                 )
-import           Tutorial.Infer                 ( typeI0
-                                                , Type
-                                                , Context
-                                                )
-import           Tutorial.Eval                  ( evalI )
-import           Data.Text.Prettyprint.Doc      ( pretty
-                                                , Pretty
-                                                )
+import           Eval                           ( evalExpr )
+import           Pretty                         ( pp )
 
+import           System.Environment             ( getArgs )
+import           Data.Foldable                  ( foldlM )
+
+-- Given a file path, parse it as a series of definitions, construct a context,
+-- typecheck everything and evaluate the 'main' function
 main :: IO ()
-main = go []
+main = do
+  [path] <- getArgs
+  input  <- readFile path
+  case go input of
+    Left  err    -> putStrLn err
+    Right result -> putStrLn (pp result)
  where
-  go env = do
-    input <- getLine
-    let result = run input env
-    print result
-    go (environment result) -- TODO: parse 'assume/let' commands that add things to the environment
+  go input = do
+    prog           <- parse input
+    (_types, vals) <- typecheck prog
+    eval vals
 
+parse :: String -> Either String [Definition]
+parse = runParseDefs
 
-run :: String -> Context -> Result
-run input env =
-  let simpleAST    = runParse input
-      term         = simpleAST >>= convert
-      inferredType = term >>= typeI0 []
-      evaluated    = flip evalI [] <$> term
-  in  R { simple      = simpleAST
-        , parsed      = term
-        , inferred    = inferredType
-        , evaluated   = evaluated
-        , environment = env
-        }
+-- Type check each definition in turn, accumulating a context of types as we go
+typecheck :: [Definition] -> Either String ([(String, Expr)], [(String, Expr)])
+typecheck = foldlM f mempty
+ where
+  f (types, vals) (Def name e) = do
+    inferredType <- runInfer (types, vals, 0) e
+    pure ((name, inferredType) : types, (name, e) : vals)
 
-data Result = R { simple :: Either String Expr
-                , parsed :: Either String TermI
-                , inferred :: Either String Type
-                , evaluated :: Either String Value
-                , environment :: Context
-                }
+-- Evaluate the first expression in the list with the others as context
+-- TODO: find 'main' and run that, even if it's not first in the list
+eval :: [(String, Expr)] -> Either String Expr
+eval vals = case lookup "main" vals of
+  Just m  -> let ctx = delete "main" vals in pure $ evalExpr ctx m
+  Nothing -> Left "'main' not found"
 
-instance Show Result where
-  show R { simple = s, parsed = p, inferred = i, evaluated = e } =
-    "R {\n"
-      <> ("\tsimple = " <> printEither s <> "\n")
-      <> ("\tparsed = " <> printEither p <> "\n")
-      <> ("\tinferred = " <> printEither (quote0 <$> i) <> "\n")
-      <> ("\tevaluated = " <> printEither (quote0 <$> e) <> "\n")
-      <> "}"
-   where
-    printEither :: Pretty a => Either String a -> String
-    printEither (Left  err) = err
-    printEither (Right a  ) = show (pretty a)
-
-forever :: Monad m => m a -> m a
-forever f = f >> forever f
+delete :: Eq a => a -> [(a, b)] -> [(a, b)]
+delete _ [] = []
+delete n ((x, y) : xs) | x == n    = delete n xs
+                       | otherwise = (x, y) : delete n xs
