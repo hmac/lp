@@ -32,6 +32,9 @@ instance Pretty (Fix (ExprF String String)) where
       LNil              -> "Nil"
       LCons x xs        -> x <+> "::" <+> xs
       ListElim m l s g  -> "ListElim" <+> m <+> l <+> s <+> g
+      T                 -> "⊤"
+      Unit              -> "Unit"
+      Void              -> "⊥"
 
 instance Pretty (Fix (ExprF () Int)) where
   pretty = cata f
@@ -58,3 +61,6 @@ instance Pretty (Fix (ExprF () Int)) where
       LNil              -> "Nil"
       LCons x xs        -> x <+> "::" <+> xs
       ListElim m l s g  -> "ListElim" <+> m <+> l <+> s <+> g
+      T                 -> "⊤"
+      Unit              -> "Unit"
+      Void              -> "⊥"

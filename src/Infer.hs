@@ -263,8 +263,13 @@ infer (Fix (ListElim m l s f)) = label "LELIM" $ do
         ++ " but inferred it to have type "
         ++ pp t
 
+-- Unit and Bottom
+infer (Fix T   ) = pure type_
+infer (Fix Void) = pure type_
+infer (Fix Unit) = pure tt
+
 -- Fallthrough
-infer e = throw $ "could not infer type of " <> pp e
+infer e          = throw $ "could not infer type of " <> pp e
 
 check :: Expr -> Expr -> ReaderT Env (Except String) ()
 

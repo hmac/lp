@@ -46,6 +46,9 @@ main = hspec $ do
     "sumElim (\\a. Zero) (\\b. Zero) (Left Type)"
       ~> sumElim (lam "a" zero) (lam "b" zero) (suml type_)
     "[Zero, Zero]" ~> lcons zero (lcons zero lnil)
+    "T" ~> tt
+    "Void" ~> void
+    "Unit" ~> unit
 
   describe "Inference" $ do
     "Type" ~~ type_
@@ -167,6 +170,11 @@ main = hspec $ do
     "[[Zero, Zero]]" ~~ list (list nat)
     "listElim ((\\l. Nat) : forall (l : List Nat). Type) [Zero, Zero] Zero ((\\x xs acc. Suc acc) : forall (x : Nat) (xs : List Nat) (acc : Nat). Nat)"
       ~~ nat
+
+    -- Unit and Bottom
+    "T" ~~ type_
+    "Void" ~~ type_
+    "Unit" ~~ tt
 
     -- Rejections
     -- unannotated lambdas are forbidden

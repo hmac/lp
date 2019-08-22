@@ -53,10 +53,10 @@ aexpr =
     <|> pProdElim
     <|> pSumIntro
     <|> pSumElim
-    <|> pListType
-    <|> pListNil
-    <|> pList
-    <|> pListElim
+    <|> top
+    <|> bottom
+    <|> pUnit
+    <|> lists
     <|> parens expr
     <|> pvar
 
@@ -129,6 +129,18 @@ pSumElim = do
   g <- aexpr
   _ <- string " "
   sumElim f g <$> aexpr
+
+top :: Parser Expr
+top = string "T" >> pure tt
+
+bottom :: Parser Expr
+bottom = string "Void" >> pure void
+
+pUnit :: Parser Expr
+pUnit = string "Unit" >> pure unit
+
+lists :: Parser Expr
+lists = pListType <|> pListNil <|> pList <|> pListElim
 
 pListType :: Parser Expr
 pListType = do

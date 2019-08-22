@@ -36,6 +36,9 @@ data ExprF b x r -- r: inductive type, b: binder type, x: variable type
   | LNil
   | LCons r r
   | ListElim r r r r
+  | T    -- T : Type
+  | Unit -- Unit : T
+  | Void
   deriving (Show, Eq, Functor)
 
 $(deriveEq1 ''ExprF)
@@ -112,6 +115,15 @@ lcons x xs = Fix $ LCons x xs
 
 listElim :: Expr -> Expr -> Expr -> Expr -> Expr
 listElim m l s f = Fix $ ListElim m l s f
+
+tt :: Expr
+tt = Fix T
+
+unit :: Expr
+unit = Fix Unit
+
+void :: Expr
+void = Fix Void
 
 -- Convert the frontend syntax into the backend syntax, replacing explicit
 -- variable names with De Bruijn indices
@@ -205,3 +217,6 @@ safeTranslate context = go (sort (map fst context))
       s' <- go ctx s
       f' <- go ctx f
       pure $ Fix $ ListElim m' l' s' f'
+    Fix T    -> pure $ Fix T
+    Fix Unit -> pure $ Fix Unit
+    Fix Void -> pure $ Fix Void

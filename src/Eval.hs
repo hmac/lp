@@ -60,6 +60,10 @@ evalExpr ctx ex = head (reduceList' ex)
       app (app (app f x) xs) (listElim m xs s f)
     Fix (ListElim m l s f) -> listElim m (reduce' l) s f
 
+    Fix T                  -> Fix T
+    Fix Unit               -> Fix Unit
+    Fix Void               -> Fix Void
+
 substitute :: String -> Expr -> Expr -> Expr
 substitute v a b = topDown' alg a
  where
