@@ -39,7 +39,7 @@ definition = do
 -- TODO: space consumer
 
 expr :: Parser Expr
-expr = try annotation <|> try productOrSum <|> application <|> aexpr
+expr = try annotation <|> try productOrSumOrCons <|> application <|> aexpr
 
 application :: Parser Expr
 application = foldl1 app <$> (aexpr `sepBy` string " ")
@@ -103,10 +103,12 @@ naturals = pNat <|> pZero <|> pSuc <|> pNatElim
     [m, mz, ms, k] <- sequenceA $ replicate 4 (string " " >> aexpr)
     pure $ natElim m mz ms k
 
-productOrSum :: Parser Expr
-productOrSum = do
+productOrSumOrCons :: Parser Expr
+productOrSumOrCons = do
   a <- aexpr
-  (string "*" >> prod a <$> expr) <|> (string "|" >> sum a <$> expr)
+  (string "*" >> prod a <$> expr)
+    <|> (string "|" >> sum a <$> expr)
+    <|> (string "::" >> lcons a <$> expr)
 
 pProdElim :: Parser Expr
 pProdElim = do
