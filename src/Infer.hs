@@ -264,12 +264,32 @@ infer (Fix (ListElim m l s f)) = label "LELIM" $ do
         ++ pp t
 
 -- Unit and Bottom
-infer (Fix T   ) = pure type_
-infer (Fix Void) = pure type_
-infer (Fix Unit) = pure tt
+infer (Fix T            ) = pure type_
+infer (Fix Void         ) = pure type_
+infer (Fix Unit         ) = pure tt
+
+infer (Fix (Equal t a b)) = label "EQ" $ do
+  check_ t type_
+  check_ a t
+  check_ b t
+  pure type_
+
+infer (Fix (Refl a)) = label "REFL" $ do
+  t <- infer_ a
+  pure $ equal t a a
+
+infer (Fix (EqElim a m mr x y eq)) = label "EQELIM" $ do
+  (_, vals, _, _) <- ask
+  check a type_
+  check m $ pi "x" a (pi "y" a (pi "eq" (equal a (var "x") (var "y")) type_))
+  check mr $ pi "x" a (app (app (app m (var "x")) (var "x")) (refl (var "x")))
+  check x a
+  check y a
+  check eq $ equal a x y
+  pure $ evalExpr vals $ app (app (app m x) y) eq
 
 -- Fallthrough
-infer e          = throw $ "could not infer type of " <> pp e
+infer e = throw $ "could not infer type of " <> pp e
 
 check :: Expr -> Expr -> ReaderT Env (Except String) ()
 

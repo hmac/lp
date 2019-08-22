@@ -49,6 +49,16 @@ main = hspec $ do
     "T" ~> tt
     "Void" ~> void
     "Unit" ~> unit
+    "I Nat Zero Zero" ~> equal nat zero zero
+    "Refl Zero" ~> refl zero
+    "eqElim Nat (\\x y eq. Nat) (\\x. Zero) Zero Zero (Refl Zero)" ~> eqElim
+      nat
+      (lam "x" (lam "y" (lam "eq" nat)))
+      (lam "x" zero)
+      zero
+      zero
+      (refl zero)
+    "eqElim T T T T T T T" ~> app (eqElim tt tt tt tt tt tt) tt
 
   describe "Inference" $ do
     "Type" ~~ type_
@@ -176,6 +186,11 @@ main = hspec $ do
     "Void" ~~ type_
     "Unit" ~~ tt
 
+    -- Equality
+    "I Nat Zero Zero" ~~ type_
+    "Refl Zero" ~~ equal nat zero zero
+    "eqElim Nat (\\x y eq. Nat) (\\x. Zero) Zero Zero (Refl Zero)" ~~ nat
+
     -- Rejections
     -- unannotated lambdas are forbidden
     illTyped "\\x. x"
@@ -224,6 +239,7 @@ main = hspec $ do
     -- list length
     "listElim ((\\l. Nat) : forall (l : List Nat). Type) [Zero, Zero] Zero ((\\x xs acc. Suc acc) : forall (x : Nat) (xs : List Nat) (acc : Nat). Nat)"
       ~* "Suc (Suc Zero)"
+    "eqElim Nat (\\x y eq. Nat) (\\x. Zero) Zero Zero (Refl Zero)" ~* "Zero"
 
 -- Expect parse
 (~>) :: String -> Expr -> Spec

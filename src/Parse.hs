@@ -24,7 +24,8 @@ runParseDefs :: String -> Either String [Definition]
 runParseDefs input = case parse program "" input of
   Left  e -> Left (errorBundlePretty e)
   Right e -> Right e
-  where program = some (definition <* many eol) <* eof
+ where
+  program = many comment >> some (definition <* many (comment <|> eol)) <* eof
 
 definition :: Parser Definition
 definition = do
@@ -36,10 +37,13 @@ definition = do
   e       <- expr
   pure $ Def name (ann e typeAnn)
 
+comment :: Parser String
+comment = string "--" >> many (noneOf ['\n']) >> eol
+
 -- TODO: space consumer
 
 expr :: Parser Expr
-expr = try annotation <|> try productOrSumOrCons <|> application <|> aexpr
+expr = try annotation <|> try infixOperator <|> application <|> aexpr
 
 application :: Parser Expr
 application = foldl1 app <$> (aexpr `sepBy` string " ")
@@ -56,6 +60,9 @@ aexpr =
     <|> top
     <|> bottom
     <|> pUnit
+    <|> pRefl
+    <|> pEq
+    <|> pEqElim
     <|> lists
     <|> parens expr
     <|> pvar
@@ -103,8 +110,8 @@ naturals = pNat <|> pZero <|> pSuc <|> pNatElim
     [m, mz, ms, k] <- sequenceA $ replicate 4 (string " " >> aexpr)
     pure $ natElim m mz ms k
 
-productOrSumOrCons :: Parser Expr
-productOrSumOrCons = do
+infixOperator :: Parser Expr
+infixOperator = do
   a <- aexpr
   (string "*" >> prod a <$> expr)
     <|> (string "|" >> sum a <$> expr)
@@ -138,6 +145,21 @@ bottom = string "Void" >> pure void
 
 pUnit :: Parser Expr
 pUnit = string "Unit" >> pure unit
+
+pRefl :: Parser Expr
+pRefl = string "Refl " >> refl <$> aexpr
+
+pEq :: Parser Expr
+pEq = do
+  _         <- string "I"
+  [t, a, b] <- sequenceA $ replicate 3 (string " " >> aexpr)
+  pure $ equal t a b
+
+pEqElim :: Parser Expr
+pEqElim = do
+  _                    <- string "eqElim"
+  [a, m, mr, x, y, eq] <- sequenceA $ replicate 6 (string " " >> aexpr)
+  pure $ eqElim a m mr x y eq
 
 lists :: Parser Expr
 lists = pListType <|> pListNil <|> pList <|> pListElim

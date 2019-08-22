@@ -39,6 +39,9 @@ data ExprF b x r -- r: inductive type, b: binder type, x: variable type
   | T    -- T : Type
   | Unit -- Unit : T
   | Void
+  | Equal r r r
+  | Refl r
+  | EqElim r r r r r r
   deriving (Show, Eq, Functor)
 
 $(deriveEq1 ''ExprF)
@@ -124,6 +127,15 @@ unit = Fix Unit
 
 void :: Expr
 void = Fix Void
+
+equal :: Expr -> Expr -> Expr -> Expr
+equal t a b = Fix $ Equal t a b
+
+refl :: Expr -> Expr
+refl a = Fix (Refl a)
+
+eqElim :: Expr -> Expr -> Expr -> Expr -> Expr -> Expr -> Expr
+eqElim a m mr x y eq = Fix $ EqElim a m mr x y eq
 
 -- Convert the frontend syntax into the backend syntax, replacing explicit
 -- variable names with De Bruijn indices
@@ -217,6 +229,22 @@ safeTranslate context = go (sort (map fst context))
       s' <- go ctx s
       f' <- go ctx f
       pure $ Fix $ ListElim m' l' s' f'
-    Fix T    -> pure $ Fix T
-    Fix Unit -> pure $ Fix Unit
-    Fix Void -> pure $ Fix Void
+    Fix T             -> pure $ Fix T
+    Fix Unit          -> pure $ Fix Unit
+    Fix Void          -> pure $ Fix Void
+    Fix (Equal t a b) -> do
+      t' <- go ctx t
+      a' <- go ctx a
+      b' <- go ctx b
+      pure $ Fix $ Equal t' a' b'
+    Fix (Refl a) -> do
+      a' <- go ctx a
+      pure $ Fix (Refl a')
+    Fix (EqElim a m mr x y eq) -> do
+      a'  <- go ctx a
+      m'  <- go ctx m
+      mr' <- go ctx mr
+      x'  <- go ctx x
+      y'  <- go ctx y
+      eq' <- go ctx eq
+      pure $ Fix $ EqElim a' m' mr' x' y' eq'

@@ -34,5 +34,26 @@ foldr = \a b f e l. listElim ((\l. b) : forall (l : List a). Type) l e ((\x xs a
 sum : forall (l : List Nat). Nat
 sum = \l. foldr Nat Nat ((\x acc. plus x acc) : forall (x : Nat) (acc : Nat). Nat) Zero l
 
-main : Nat
-main = sum [Zero, Suc Zero, Suc (Suc Zero), Suc (Suc (Suc Zero))]
+eqsymm : forall (a : Type) (x : a) (y : a) (eq : I a x y). I a y x
+eqsymm = \a x y eq. eqElim a (\x y eq. I a y x) (\x. Refl x) x y eq
+
+eqtrans : forall (a : Type) (x : a) (y : a) (z : a) (xeqy : I a x y) (yeqz : I a y z). I a x z
+eqtrans = \a x y z xeqy. eqElim a (\x y xeqy. forall (z : a) (eq : I a y z). I a x z) ((\x z xeqz. xeqz) : forall (x : a) (z : a) (xeqz : I a x z). I a x z) x y xeqy z
+
+exists : forall (a : Type) (b : forall (x : a). Type) (x : a) (p : b x). a*(b x)
+exists = \a b x p. x*p
+
+not : forall (a : Type). Type
+not = \a. forall (x : a). Void
+
+leibniz : forall (a : Type) (b : Type) (f : forall (x : a). b) (x : a) (y : a) (eq : I a x y). I b (f x) (f y)
+leibniz = \a b f x y eq. eqElim a (\x y xeqy. I b (f x) (f y)) (\x. Refl (f x)) x y eq
+
+-- apply : forall (a : Type) (b : Type) (p : I Type a b) (x : a). b
+-- apply = \a b p x. eqElim Type (\a b eq. forall (x : a). b) ((\t x. x) : forall (t : a) (x : t). t) a b p x
+
+withZero : forall (a : Type). forall (x : a). a*Nat
+withZero = \a x. x*Zero
+
+main : I (Nat*Nat) (Zero*Zero) (Zero*Zero)
+main = leibniz Nat (Nat*Nat) (withZero Nat) Zero Zero (Refl Zero)
