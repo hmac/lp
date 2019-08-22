@@ -28,6 +28,10 @@ instance Pretty (Fix (ExprF String String)) where
       SumL l            -> "Left" <+> l
       SumR r            -> "Right" <+> r
       SumElim lf rf s   -> "sumElim" <+> lf <+> rf <+> s
+      List t            -> "List" <+> t
+      LNil              -> "Nil"
+      LCons x xs        -> x <+> "::" <+> xs
+      ListElim m l s g  -> "ListElim" <+> m <+> l <+> s <+> g
 
 instance Pretty (Fix (ExprF () Int)) where
   pretty = cata f
@@ -50,3 +54,7 @@ instance Pretty (Fix (ExprF () Int)) where
       SumL l            -> "Left" <+> l
       SumR r            -> "Right" <+> r
       SumElim lf rf s   -> "sumElim" <+> lf <+> rf <+> s
+      List t            -> "List" <+> t
+      LNil              -> "Nil"
+      LCons x xs        -> x <+> "::" <+> xs
+      ListElim m l s g  -> "ListElim" <+> m <+> l <+> s <+> g

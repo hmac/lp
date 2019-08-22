@@ -44,12 +44,21 @@ evalExpr ctx ex = head (reduceList' ex)
     Fix (Prod     a b                 ) -> prod (reduce' a) (reduce' b)
     Fix (ProdElim f (Fix (Prod a b))  ) -> app (app f a) b
     Fix (ProdElim f p                 ) -> prodElim f (reduce' p)
+
     Fix (Sum      l r                 ) -> sum (reduce' l) (reduce' r)
     Fix (SumL l                       ) -> suml (reduce' l)
     Fix (SumR r                       ) -> sumr (reduce' r)
     Fix (SumElim f _ (Fix (SumL l))   ) -> app f l
     Fix (SumElim _ g (Fix (SumR r))   ) -> app g r
     Fix (SumElim f g s                ) -> sumElim f g (reduce' s)
+
+    Fix (List t                       ) -> list (reduce' t)
+    Fix LNil                            -> lnil
+    Fix (LCons x xs               )     -> lcons (reduce' x) (reduce' xs)
+    Fix (ListElim _ (Fix LNil) s _)     -> s
+    Fix (ListElim m (Fix (LCons x xs)) s f) ->
+      app (app (app f x) xs) (listElim m xs s f)
+    Fix (ListElim m l s f) -> listElim m (reduce' l) s f
 
 substitute :: String -> Expr -> Expr -> Expr
 substitute v a b = topDown' alg a

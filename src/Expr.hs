@@ -32,6 +32,10 @@ data ExprF b x r -- r: inductive type, b: binder type, x: variable type
   | SumL r
   | SumR r
   | SumElim r r r
+  | List r
+  | LNil
+  | LCons r r
+  | ListElim r r r r
   deriving (Show, Eq, Functor)
 
 $(deriveEq1 ''ExprF)
@@ -96,6 +100,18 @@ sumr = Fix . SumR
 
 sumElim :: Expr -> Expr -> Expr -> Expr
 sumElim lf rf s = Fix $ SumElim lf rf s
+
+list :: Expr -> Expr
+list = Fix . List
+
+lnil :: Expr
+lnil = Fix LNil
+
+lcons :: Expr -> Expr -> Expr
+lcons x xs = Fix $ LCons x xs
+
+listElim :: Expr -> Expr -> Expr -> Expr -> Expr
+listElim m l s f = Fix $ ListElim m l s f
 
 -- Convert the frontend syntax into the backend syntax, replacing explicit
 -- variable names with De Bruijn indices
@@ -175,7 +191,17 @@ safeTranslate context = go (sort (map fst context))
       rf' <- go ctx rf
       s'  <- go ctx s
       pure $ Fix $ SumElim lf' rf' s'
-
--- Utilities
-mapSnd :: (b -> c) -> [(a, b)] -> [(a, c)]
-mapSnd f = map (\(x, y) -> (x, f y))
+    Fix (List t) -> do
+      t' <- go ctx t
+      pure $ Fix $ List t'
+    Fix LNil         -> pure $ Fix LNil
+    Fix (LCons x xs) -> do
+      x'  <- go ctx x
+      xs' <- go ctx xs
+      pure $ Fix $ LCons x' xs'
+    Fix (ListElim m l s f) -> do
+      m' <- go ctx m
+      l' <- go ctx l
+      s' <- go ctx s
+      f' <- go ctx f
+      pure $ Fix $ ListElim m' l' s' f'

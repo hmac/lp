@@ -53,6 +53,10 @@ aexpr =
     <|> pProdElim
     <|> pSumIntro
     <|> pSumElim
+    <|> pListType
+    <|> pListNil
+    <|> pList
+    <|> pListElim
     <|> parens expr
     <|> pvar
 
@@ -124,6 +128,25 @@ pSumElim = do
   _ <- string " "
   sumElim f g <$> aexpr
 
+pListType :: Parser Expr
+pListType = do
+  _ <- string "List "
+  list <$> aexpr
+
+pListNil :: Parser Expr
+pListNil = string "[]" >> pure lnil
+
+pList :: Parser Expr
+pList = brackets $ do
+  elems <- expr `sepBy` string ", "
+  pure $ foldr lcons lnil elems
+
+pListElim :: Parser Expr
+pListElim = do
+  _            <- string "listElim"
+  [m, l, s, f] <- sequenceA $ replicate 4 (string " " >> aexpr)
+  pure $ listElim m l s f
+
 pvar :: Parser Expr
 pvar = var <$> termName
 
@@ -132,3 +155,6 @@ termName = some alphaNumChar
 
 parens :: Parser p -> Parser p
 parens = between (string "(") (string ")")
+
+brackets :: Parser p -> Parser p
+brackets = between (string "[") (string "]")

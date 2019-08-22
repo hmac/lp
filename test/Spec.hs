@@ -45,6 +45,7 @@ main = hspec $ do
     "Left Zero" ~> suml zero
     "sumElim (\\a. Zero) (\\b. Zero) (Left Type)"
       ~> sumElim (lam "a" zero) (lam "b" zero) (suml type_)
+    "[Zero, Zero]" ~> lcons zero (lcons zero lnil)
 
   describe "Inference" $ do
     "Type" ~~ type_
@@ -159,6 +160,14 @@ main = hspec $ do
     "sumElim ((\\x. Zero) : forall (x : Nat). Nat) ((\\x. Zero) : forall (x : Nat). Nat) ((Left Zero) : (Nat|Nat))"
       ~~ nat
 
+    -- List
+    "List Nat" ~~ type_
+    "[Zero, Zero]" ~~ list nat
+    "[] : List Nat" ~~ list nat
+    "[[Zero, Zero]]" ~~ list (list nat)
+    "listElim ((\\l. Nat) : forall (l : List Nat). Type) [Zero, Zero] Zero ((\\x xs acc. Suc acc) : forall (x : Nat) (xs : List Nat) (acc : Nat). Nat)"
+      ~~ nat
+
     -- Rejections
     -- unannotated lambdas are forbidden
     illTyped "\\x. x"
@@ -204,6 +213,9 @@ main = hspec $ do
       ~* "Zero"
     "sumElim ((\\x. Zero) : forall (x : Nat). Nat) ((\\x. Zero) : forall (x : Nat). Nat) ((Left Zero) : (Nat|Nat))"
       ~* "Zero"
+    -- list length
+    "listElim ((\\l. Nat) : forall (l : List Nat). Type) [Zero, Zero] Zero ((\\x xs acc. Suc acc) : forall (x : Nat) (xs : List Nat) (acc : Nat). Nat)"
+      ~* "Suc (Suc Zero)"
 
 -- Expect parse
 (~>) :: String -> Expr -> Spec
