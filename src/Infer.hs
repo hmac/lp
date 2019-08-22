@@ -2,9 +2,8 @@
 module Infer where
 
 import           Prelude                 hiding ( pi )
-import           Data.Monoid                    ( Sum(..)
-                                                , Monoid
-                                                )
+import qualified Data.Monoid                   as Monoid
+                                                ( Sum(..) )
 import           Data.Functor.Foldable
 import           Control.Monad.Trans.Reader
 import           Control.Monad.Trans.Except
@@ -21,7 +20,7 @@ import           Pretty
 import           System.IO.Unsafe               ( unsafePerformIO )
 
 -- so we can still use mempty for Env
-newtype Depth = Depth Int deriving (Semigroup, Monoid) via (Sum Int)
+newtype Depth = Depth Int deriving (Semigroup, Monoid) via (Monoid.Sum Int)
                           deriving Show
                           deriving Num via Int
 
@@ -181,6 +180,35 @@ infer (Fix (ProdElim f p)) = do
         ++ " to be a product type, but inferred it to be "
         ++ pp tp
 
+-- Sum
+infer (Fix (Sum l r)) = do
+  check_ r type_
+  check_ l type_
+  pure type_
+infer (Fix (SumElim lf rf s)) = do
+  ts   <- infer_ s
+  t_lf <- infer_ lf
+  case ts of
+    Fix (Sum l r) -> case t_lf of
+      (Fix (Pi _ tl lf_result)) | tl == l -> do
+        check_ lf (pi "_" l lf_result)
+        check_ rf (pi "_" r lf_result)
+        pure lf_result
+      t ->
+        throw
+          $  "expected "
+          ++ pp lf
+          ++ " to have type "
+          ++ pp (pi "_" l (var "<some type>"))
+          ++ ", but inferred it to have type "
+          ++ pp t
+    t ->
+      throw
+        $  "expected "
+        ++ pp s
+        ++ " to be a Sum type, but inferred it to have type "
+        ++ pp t
+
 -- Fallthrough
 infer e = throw $ "could not infer type of " <> pp e
 
@@ -202,6 +230,9 @@ check (Fix (Lam x e)) (Fix (Pi x' t t')) = label "LAM" $ do
   _ <- local (const env') $ check_ e t'
   pure ()
 
+check (Fix (SumL l)) (Fix (Sum lt _ )) = label "SUML" $ check_ l lt
+check (Fix (SumR r)) (Fix (Sum _  rt)) = label "SUMR" $ check_ r rt
+
 -- 𝚪 ⊢ e :↑ t
 ------------- (CHK)
 -- 𝚪 ⊢ e :↓ t
@@ -210,7 +241,7 @@ check (Fix (Lam x e)) (Fix (Pi x' t t')) = label "LAM" $ do
 -- convert them to BExprs (de Bruijn indexed) and directly compare them for
 -- structural equality.
 -- This means we can ignore differences in variable names.
-check e t = label "CHK" $ do
+check e              t                 = label "CHK" $ do
   env <- ask
   trace $ "CHK " ++ pp e ++ " : " ++ pp t
   let (types, vals, _) = env

@@ -4,6 +4,7 @@ module Eval
   )
 where
 
+import           Prelude                 hiding ( sum )
 import           Data.Functor.Foldable
 import           Expr                    hiding ( Context )
 import           Data.Maybe                     ( fromMaybe )
@@ -43,6 +44,12 @@ evalExpr ctx ex = head (reduceList' ex)
     Fix (Prod     a b                 ) -> prod (reduce' a) (reduce' b)
     Fix (ProdElim f (Fix (Prod a b))  ) -> app (app f a) b
     Fix (ProdElim f p                 ) -> prodElim f (reduce' p)
+    Fix (Sum      l r                 ) -> sum (reduce' l) (reduce' r)
+    Fix (SumL l                       ) -> suml (reduce' l)
+    Fix (SumR r                       ) -> sumr (reduce' r)
+    Fix (SumElim f _ (Fix (SumL l))   ) -> app f l
+    Fix (SumElim _ g (Fix (SumR r))   ) -> app g r
+    Fix (SumElim f g s                ) -> sumElim f g (reduce' s)
 
 substitute :: String -> Expr -> Expr -> Expr
 substitute v a b = topDown' alg a

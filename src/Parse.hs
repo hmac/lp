@@ -2,6 +2,7 @@ module Parse where
 
 import           Prelude                 hiding ( pi
                                                 , product
+                                                , sum
                                                 )
 import           Data.Void
 
@@ -20,7 +21,7 @@ runParse input = case parse expr "" input of
 -- TODO: space consumer
 
 expr :: Parser Expr
-expr = try annotation <|> try product <|> application <|> aexpr
+expr = try annotation <|> try productOrSum <|> application <|> aexpr
 
 application :: Parser Expr
 application = foldl1 app <$> (aexpr `sepBy` string " ")
@@ -32,6 +33,8 @@ aexpr =
     <|> forall
     <|> naturals
     <|> pProdElim
+    <|> pSumIntro
+    <|> pSumElim
     <|> parens expr
     <|> pvar
 
@@ -78,11 +81,10 @@ naturals = pNat <|> pZero <|> pSuc <|> pNatElim
     [m, mz, ms, k] <- sequenceA $ replicate 4 (string " " >> aexpr)
     pure $ natElim m mz ms k
 
-product :: Parser Expr
-product = do
+productOrSum :: Parser Expr
+productOrSum = do
   a <- aexpr
-  _ <- string "*"
-  prod a <$> aexpr
+  (string "*" >> prod a <$> expr) <|> (string "|" >> sum a <$> expr)
 
 pProdElim :: Parser Expr
 pProdElim = do
@@ -90,6 +92,19 @@ pProdElim = do
   f <- aexpr
   _ <- string " "
   prodElim f <$> aexpr
+
+pSumIntro :: Parser Expr
+pSumIntro =
+  (string "Left " >> suml <$> aexpr) <|> (string "Right " >> sumr <$> aexpr)
+
+pSumElim :: Parser Expr
+pSumElim = do
+  _ <- string "sumElim "
+  f <- aexpr
+  _ <- string " "
+  g <- aexpr
+  _ <- string " "
+  sumElim f g <$> aexpr
 
 pvar :: Parser Expr
 pvar = var <$> termName

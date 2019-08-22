@@ -4,7 +4,9 @@
 {-# LANGUAGE FlexibleInstances #-}
 module Expr where
 
-import           Prelude                 hiding ( pi )
+import           Prelude                 hiding ( pi
+                                                , sum
+                                                )
 
 import           Data.Functor.Foldable
 import           Data.Eq.Deriving
@@ -26,6 +28,10 @@ data ExprF b x r -- r: inductive type, b: binder type, x: variable type
   | NatElim r r r r
   | Prod r r
   | ProdElim r r
+  | Sum r r
+  | SumL r
+  | SumR r
+  | SumElim r r r
   deriving (Show, Eq, Functor)
 
 $(deriveEq1 ''ExprF)
@@ -78,6 +84,18 @@ prod a b = Fix $ Prod a b
 
 prodElim :: Expr -> Expr -> Expr
 prodElim f p = Fix $ ProdElim f p
+
+sum :: Expr -> Expr -> Expr
+sum l r = Fix $ Sum l r
+
+suml :: Expr -> Expr
+suml = Fix . SumL
+
+sumr :: Expr -> Expr
+sumr = Fix . SumR
+
+sumElim :: Expr -> Expr -> Expr -> Expr
+sumElim lf rf s = Fix $ SumElim lf rf s
 
 -- Convert the frontend syntax into the backend syntax, replacing explicit
 -- variable names with De Bruijn indices
@@ -142,6 +160,21 @@ safeTranslate context = go (sort (map fst context))
       f' <- go ctx f
       p' <- go ctx p
       pure $ Fix $ ProdElim f' p'
+    Fix (Sum l r) -> do
+      l' <- go ctx l
+      r' <- go ctx r
+      pure $ Fix $ Sum l' r'
+    Fix (SumL l) -> do
+      l' <- go ctx l
+      pure $ Fix $ SumL l'
+    Fix (SumR r) -> do
+      r' <- go ctx r
+      pure $ Fix $ SumR r'
+    Fix (SumElim lf rf s) -> do
+      lf' <- go ctx lf
+      rf' <- go ctx rf
+      s'  <- go ctx s
+      pure $ Fix $ SumElim lf' rf' s'
 
 -- Utilities
 mapSnd :: (b -> c) -> [(a, b)] -> [(a, c)]

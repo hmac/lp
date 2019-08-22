@@ -1,4 +1,6 @@
-import           Prelude                 hiding ( pi )
+import           Prelude                 hiding ( pi
+                                                , sum
+                                                )
 
 import           Test.Hspec
 import           Test.Hspec.Megaparsec
@@ -37,6 +39,12 @@ main = hspec $ do
     "Zero*(Suc Zero)" ~> prod zero (suc zero)
     "prodElim (\\a b. a) (Zero*Zero)"
       ~> prodElim (lam "a" (lam "b" (var "a"))) (prod zero zero)
+    "Nat|Nat" ~> sum nat nat
+    "Nat|(Nat|Type)" ~> sum nat (sum nat type_)
+    "Nat|(Nat*Type)" ~> sum nat (prod nat type_)
+    "Left Zero" ~> suml zero
+    "sumElim (\\a. Zero) (\\b. Zero) (Left Type)"
+      ~> sumElim (lam "a" zero) (lam "b" zero) (suml type_)
 
   describe "Inference" $ do
     "Type" ~~ type_
@@ -144,6 +152,13 @@ main = hspec $ do
             type_
             (pi "b" type_ (pi "p" (prod (var "a") (var "b")) (var "b")))
 
+    -- Sum
+    "(Nat|Type)" ~~ type_
+    "(Nat|(Nat*Nat))" ~~ type_
+    "(Left Zero) : (Nat|Type)" ~~ sum nat type_
+    "sumElim ((\\x. Zero) : forall (x : Nat). Nat) ((\\x. Zero) : forall (x : Nat). Nat) ((Left Zero) : (Nat|Nat))"
+      ~~ nat
+
     -- Rejections
     -- unannotated lambdas are forbidden
     illTyped "\\x. x"
@@ -159,6 +174,9 @@ main = hspec $ do
       "prodElim ((\\a b. a) : forall (a : Nat) (b : Nat). Nat) (Zero*Nat)"
     illTyped
       "prodElim ((\\a b. b) : forall (a : Nat) (b : Type). Nat) (Zero*Nat)"
+    -- projection functions should have matching return types
+    illTyped
+      "sumElim ((\\x. Type) : forall (x : Nat). Nat) ((\\x. Zero) : forall (x : Nat). Nat) ((Left Zero) : (Nat|Nat))"
 
   describe "Evaluation" $ do
     "((\\t x. x) : forall (t : Type) (x : t). t) Type Type" ~* "Type"
@@ -183,6 +201,8 @@ main = hspec $ do
       ~* "Nat"
     -- uncurry const Zero (Suc Zero) (== fst (Zero, Suc Zero))
     "((\\a b c f p. prodElim f p) : forall (a : Type) (b : Type) (c : Type) (f : forall (x : a) (y : b). c) (p : a*b). c) Nat Nat Nat ((\\x y. x) : forall (x : Nat) (y : Nat). Nat) (Zero*(Suc Zero))"
+      ~* "Zero"
+    "sumElim ((\\x. Zero) : forall (x : Nat). Nat) ((\\x. Zero) : forall (x : Nat). Nat) ((Left Zero) : (Nat|Nat))"
       ~* "Zero"
 
 -- Expect parse
