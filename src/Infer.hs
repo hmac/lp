@@ -24,6 +24,11 @@ newtype Depth = Depth Int deriving (Semigroup, Monoid) via (Monoid.Sum Int)
                           deriving Show
                           deriving Num via Int
 
+type Context = [(String, Expr)]
+type Env = (Context, Context, Depth, Debug) -- (types, values, stack depth)
+
+data Debug = DebugOn | DebugOff deriving Show
+
 check_ :: Expr -> Expr -> ReaderT Env (Except String) ()
 check_ e t = step (check e t)
 
@@ -32,24 +37,23 @@ infer_ e = step (infer e)
 
 step :: Monad m => ReaderT Env m a -> ReaderT Env m a
 step f = do
-  (types, vals, depth) <- ask
-  local (const (types, vals, depth + 1)) f
+  (types, vals, depth, debug) <- ask
+  local (const (types, vals, depth + 1, debug)) f
 
 trace :: Monad m => String -> ReaderT Env m ()
 trace msg = do
-  (_, _, Depth depth) <- ask
+  (_, _, Depth depth, debug) <- ask
   let prefix = replicate (depth * 2) '-'
       msg'   = prefix ++ msg
-  unsafePerformIO $ putStrLn msg' >> pure (pure ())
+  case debug of
+    DebugOn  -> unsafePerformIO $ putStrLn msg' >> pure (pure ())
+    DebugOff -> pure ()
 
 spy :: Monad m => ReaderT Env m Expr -> ReaderT Env m Expr
 spy f = do
   x <- f
   trace $ "[" ++ pp x ++ "]"
   pure x
-
-type Context = [(String, Expr)]
-type Env = (Context, Context, Depth) -- (types, values, stack depth)
 
 -- A helper to let us annotate errors with their source
 label
@@ -59,8 +63,13 @@ label = flip (<?>)
   e <?> s =
     let f err = err <> " [" <> s <> "]" in mapReaderT (withExceptT f) e
 
-runInfer :: Env -> Expr -> Either String Expr
-runInfer env expr = runExcept (runReaderT (infer expr) env)
+runInfer :: (Context, Context) -> Expr -> Either String Expr
+runInfer (types, vals) expr =
+  runExcept (runReaderT (infer expr) (types, vals, 0, DebugOff))
+
+runInferDebug :: (Context, Context) -> Expr -> Either String Expr
+runInferDebug (types, vals) expr =
+  runExcept (runReaderT (infer expr) (types, vals, 0, DebugOn))
 
 -- for debugging
 runCheck :: Env -> Expr -> Expr -> Either String ()
@@ -73,7 +82,7 @@ infer :: Expr -> ReaderT Env (Except String) Expr
 infer (Fix (Ann e t)) = label "ANN" $ do
   trace "ANN"
   check_ t (Fix Type)
-  (_types, vals, _) <- ask
+  (_types, vals, _, _) <- ask
   let t' = evalExpr vals t
   trace $ "t: " ++ pp t'
   check_ e t'
@@ -85,7 +94,7 @@ infer (Fix Type   ) = pure (Fix Type)
 -- VAR
 infer (Fix (Var v)) = label "VAR" $ do
   trace $ "VAR (" ++ v ++ ")"
-  (types, _, _) <- ask
+  (types, _, _, _) <- ask
   case lookup v types of
     Just t -> spy $ pure t
     Nothing ->
@@ -99,17 +108,17 @@ infer (Fix (Var v)) = label "VAR" $ do
 infer (Fix (Pi x t e)) = label "PI" $ do
   trace "PI"
   check_ t (Fix Type)
-  (types, vals, d) <- ask
+  (types, vals, d, debug) <- ask
   let t'   = evalExpr vals t
-  let env' = ((x, t') : types, vals, d)
+  let env' = ((x, t') : types, vals, d, debug)
   _ <- local (const env') $ check_ e (Fix Type)
   spy $ pure (Fix Type)
 
 -- APP
 infer (Fix (App e e')) = label "APP" $ do
   trace $ "APP " ++ pp (Fix (App e e'))
-  (types, vals, _) <- ask
-  e_type           <- infer_ e
+  (types, vals, _, _) <- ask
+  e_type              <- infer_ e
   trace $ "e: " ++ pp e
   trace $ "e': " ++ pp e'
   trace $ "e_type: " ++ pp e_type
@@ -141,7 +150,7 @@ infer (Fix (Suc n)) = label "SUC" $ do
   pure nat
 infer (Fix (NatElim m mz ms k)) = label "NATELIM" $ do
   check_ m (pi "_" nat type_)
-  (_, vals, _) <- ask
+  (_, vals, _, _) <- ask
   let t = evalExpr vals (app m zero)
   check_ mz t
   let t' = evalExpr vals
@@ -220,10 +229,10 @@ check (Fix Type     ) (Fix Type        ) = pure ()
 -- LAM
 check (Fix (Lam x e)) (Fix (Pi x' t t')) = label "LAM" $ do
   trace $ "LAM " ++ pp (Fix (Lam x e)) ++ " : " ++ pp (Fix (Pi x' t t'))
-  (types, vals, d) <- ask
+  (types, vals, d, debug) <- ask
   check_ (evalExpr vals t) (Fix Type)
   -- Assume (x : t) and (x' : t) and add this to the environment when checking (e : t')
-  let env' = ((x, t) : (x', t) : types, vals, d)
+  let env' = ((x, t) : (x', t) : types, vals, d, debug)
   trace $ "env': " ++ show env'
   -- trace $ "e: " ++ pp e
   -- trace $ "t': " ++ pp t'
@@ -244,7 +253,7 @@ check (Fix (SumR r)) (Fix (Sum _  rt)) = label "SUMR" $ check_ r rt
 check e              t                 = label "CHK" $ do
   env <- ask
   trace $ "CHK " ++ pp e ++ " : " ++ pp t
-  let (types, vals, _) = env
+  let (types, vals, _, debug) = env
   t' <- evalExpr vals <$> infer_ e
   let tn  = evalExpr [] t
       t'b = safeTranslate types t'

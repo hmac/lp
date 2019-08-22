@@ -2,7 +2,9 @@ module Main where
 
 import           Expr
 import           Expr.Pretty                    ( )
-import           Infer                          ( runInfer )
+import           Infer                          ( runInfer
+                                                , Debug(..)
+                                                )
 import           Parse                          ( runParse
                                                 , runParseDefs
                                                 , Definition(..)
@@ -36,7 +38,7 @@ typecheck :: [Definition] -> Either String ([(String, Expr)], [(String, Expr)])
 typecheck = foldlM f mempty
  where
   f (types, vals) (Def name e) = do
-    inferredType <- runInfer (types, vals, 0) e
+    inferredType <- runInfer (types, vals) e
     pure ((name, inferredType) : types, (name, e) : vals)
 
 -- Evaluate the first expression in the list with the others as context
