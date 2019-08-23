@@ -15,6 +15,8 @@ import           Data.List                      ( elemIndex
                                                 , sort
                                                 )
 
+-- TODO: move the builtin functions (mostly eliminators) to a prelude context,
+-- and treat them syntactically like normal variables
 data ExprF b x r -- r: inductive type, b: binder type, x: variable type
   = Var x
   | Ann r r
@@ -42,6 +44,9 @@ data ExprF b x r -- r: inductive type, b: binder type, x: variable type
   | Equal r r r
   | Refl r
   | EqElim r r r r r r
+  | W r r
+  | Sup r r
+  | Absurd r
   deriving (Show, Eq, Functor)
 
 $(deriveEq1 ''ExprF)
@@ -136,6 +141,15 @@ refl a = Fix (Refl a)
 
 eqElim :: Expr -> Expr -> Expr -> Expr -> Expr -> Expr -> Expr
 eqElim a m mr x y eq = Fix $ EqElim a m mr x y eq
+
+w :: Expr -> Expr -> Expr
+w a b = Fix $ W a b
+
+sup :: Expr -> Expr -> Expr
+sup a b = Fix $ Sup a b
+
+absurd :: Expr -> Expr
+absurd = Fix . Absurd
 
 -- Convert the frontend syntax into the backend syntax, replacing explicit
 -- variable names with De Bruijn indices
@@ -248,3 +262,14 @@ safeTranslate context = go (sort (map fst context))
       y'  <- go ctx y
       eq' <- go ctx eq
       pure $ Fix $ EqElim a' m' mr' x' y' eq'
+    Fix (W a b) -> do
+      a' <- go ctx a
+      b' <- go ctx b
+      pure $ Fix $ W a' b'
+    Fix (Sup a b) -> do
+      a' <- go ctx a
+      b' <- go ctx b
+      pure $ Fix $ Sup a' b'
+    Fix (Absurd r) -> do
+      r' <- go ctx r
+      pure $ Fix $ Absurd r'

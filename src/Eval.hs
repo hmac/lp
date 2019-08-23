@@ -63,11 +63,15 @@ evalExpr ctx ex = head (reduceList' ex)
     Fix T                                  -> Fix T
     Fix Unit                               -> Fix Unit
     Fix Void                               -> Fix Void
+    Fix (Absurd t                        ) -> absurd (reduce' t)
     Fix (Equal t a b) -> equal (reduce' t) (reduce' a) (reduce' b)
     Fix (Refl a                          ) -> refl (reduce' a)
     -- TODO: check that the below is correct
     Fix (EqElim _ _ mr _ _ (Fix (Refl z))) -> app mr z
     Fix (EqElim a m mr x y eq            ) -> eqElim a m mr x y (reduce' eq)
+
+    Fix (W   a b                         ) -> w (reduce' a) (reduce' b)
+    Fix (Sup a b                         ) -> sup (reduce' a) (reduce' b)
 
 substitute :: String -> Expr -> Expr -> Expr
 substitute v a b = topDown' alg a

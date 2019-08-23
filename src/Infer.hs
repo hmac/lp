@@ -266,6 +266,7 @@ infer (Fix (ListElim m l s f)) = label "LELIM" $ do
 -- Unit and Bottom
 infer (Fix T            ) = pure type_
 infer (Fix Void         ) = pure type_
+infer (Fix (Absurd t)   ) = check t type_ >> pure t
 infer (Fix Unit         ) = pure tt
 
 infer (Fix (Equal t a b)) = label "EQ" $ do
@@ -287,6 +288,31 @@ infer (Fix (EqElim a m mr x y eq)) = label "EQELIM" $ do
   check y a
   check eq $ equal a x y
   pure $ evalExpr vals $ app (app (app m x) y) eq
+
+-- W constructor
+infer (Fix (W a b)) = label "W" $ do
+  check_ a type_
+  check b (pi "x" a type_)
+  pure type_
+infer (Fix (Sup a b)) = label "SUP" $ do
+  ta <- infer_ a
+  tb <- infer_ b
+  case tb of
+    Fix (Pi _ _ (Fix (W wa wb))) -> do
+      let tx = app wb a
+      check b (pi "_" tx (w ta wb))
+      pure (w wa wb)
+    t ->
+      throw
+        $  "expected "
+        ++ pp b
+        ++ " to have have a type of the form "
+        ++ pp (pi "_" (var "B(a)") (w (var "A") (var "B")))
+        ++ " but inferred it to have type "
+        ++ pp t
+
+
+
 
 -- Fallthrough
 infer e = throw $ "could not infer type of " <> pp e

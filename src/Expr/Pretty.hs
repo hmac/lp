@@ -32,12 +32,15 @@ instance Pretty (Fix (ExprF String String)) where
       LNil                 -> "Nil"
       LCons x xs           -> x <+> "::" <+> xs
       ListElim m l s g     -> "ListElim" <+> m <+> l <+> s <+> g
-      T                    -> "⊤"
+      T                    -> "T"
       Unit                 -> "Unit"
-      Void                 -> "⊥"
+      Void                 -> "Void"
       Equal _ a b          -> a <+> "=" <+> b
       Refl a               -> "Refl" <+> a
       EqElim a m mr x y eq -> "eqElim" <+> a <+> m <+> mr <+> x <+> y <+> eq
+      W   a b              -> "W" <+> a <+> b
+      Sup a b              -> "sup" <+> a <+> b
+      Absurd t             -> "absurd" <+> t
 
 instance Pretty (Fix (ExprF () Int)) where
   pretty = cata f
@@ -64,9 +67,12 @@ instance Pretty (Fix (ExprF () Int)) where
       LNil                 -> "Nil"
       LCons x xs           -> x <+> "::" <+> xs
       ListElim m l s g     -> "ListElim" <+> m <+> l <+> s <+> g
-      T                    -> "⊤"
+      T                    -> "T"
       Unit                 -> "Unit"
-      Void                 -> "⊥"
+      Void                 -> "Void"
       Equal _ a b          -> a <+> "=" <+> b
       Refl a               -> "Refl" <+> a
       EqElim a m mr x y eq -> "eqElim" <+> a <+> m <+> mr <+> x <+> y <+> eq
+      W   a b              -> "W" <+> a <+> b
+      Sup a b              -> "sup" <+> a <+> b
+      Absurd t             -> "absurd" <+> t

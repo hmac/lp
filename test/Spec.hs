@@ -59,6 +59,9 @@ main = hspec $ do
       zero
       (refl zero)
     "eqElim T T T T T T T" ~> app (eqElim tt tt tt tt tt tt) tt
+    "W a b" ~> w (var "a") (var "b")
+    "sup a b" ~> sup (var "a") (var "b")
+    "absurd Nat" ~> absurd nat
 
   describe "Inference" $ do
     "Type" ~~ type_
@@ -190,6 +193,11 @@ main = hspec $ do
     "I Nat Zero Zero" ~~ type_
     "Refl Zero" ~~ equal nat zero zero
     "eqElim Nat (\\x y eq. Nat) (\\x. Zero) Zero Zero (Refl Zero)" ~~ nat
+
+    -- W
+    "W T (\\x. T)" ~~ type_
+    "sup Unit ((\\x. absurd (W T (\\x. Void))) : forall (x : Void). W T (\\x. Void))"
+      ~~ w tt (lam "x" void)
 
     -- Rejections
     -- unannotated lambdas are forbidden

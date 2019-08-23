@@ -4,7 +4,7 @@ import           Prelude                 hiding ( pi
                                                 , product
                                                 , sum
                                                 )
-import           Data.Void
+import           Data.Void                      ( Void )
 
 import           Text.Megaparsec
 import           Text.Megaparsec.Char
@@ -59,10 +59,12 @@ aexpr =
     <|> pSumElim
     <|> top
     <|> bottom
+    <|> pAbsurd
     <|> pUnit
     <|> pRefl
     <|> pEq
     <|> pEqElim
+    <|> pW
     <|> lists
     <|> parens expr
     <|> pvar
@@ -143,6 +145,9 @@ top = string "T" >> pure tt
 bottom :: Parser Expr
 bottom = string "Void" >> pure void
 
+pAbsurd :: Parser Expr
+pAbsurd = string "absurd " >> absurd <$> aexpr
+
 pUnit :: Parser Expr
 pUnit = string "Unit" >> pure unit
 
@@ -160,6 +165,12 @@ pEqElim = do
   _                    <- string "eqElim"
   [a, m, mr, x, y, eq] <- sequenceA $ replicate 6 (string " " >> aexpr)
   pure $ eqElim a m mr x y eq
+
+pW :: Parser Expr
+pW = do
+  f      <- (string "W" >> pure w) <|> (string "sup" >> pure sup)
+  [a, b] <- sequenceA $ replicate 2 (string " " >> aexpr)
+  pure $ f a b
 
 lists :: Parser Expr
 lists = pListType <|> pListNil <|> pList <|> pListElim
