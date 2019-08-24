@@ -1,22 +1,18 @@
 module Expr.Prelude where
 
-import           Prelude                 hiding ( pi
-                                                , sum
-                                                )
 import           Expr
 
--- Prelude
 prelude :: (Context, Context)
 prelude = (preludeTypes, preludeVals)
 
 -- Builtin functions
 preludeVals :: Context
 preludeVals =
-  [ ("natElim" , natElim)
-  , ("prodElim", prodElim)
-  , ("sumElim" , sumElim)
-  , ("listElim", listElim)
-  , ("finElim" , finElim)
+  [ ("natElim" , NatElim)
+  , ("prodElim", ProdElim)
+  , ("sumElim" , SumElim)
+  , ("listElim", ListElim)
+  , ("finElim" , FinElim)
   ]
 
 -- Builtin function types
@@ -27,20 +23,20 @@ preludeTypes =
   --                  (ms : forall (l : Nat) (_ : m l). m (Suc l)
   --                  (k : Nat). m k
   [ ( "natElim"
-    , pi
+    , Pi
       "m"
-      (pi "_" nat type_)
-      (pi
+      (Pi "_" Nat Type)
+      (Pi
         "mz"
-        (app (var "m") zero)
-        (pi
+        (App (Var "m") Zero)
+        (Pi
           "ms"
-          (pi
+          (Pi
             "l"
-            nat
-            (pi "_" (app (var "m") (var "l")) (app (var "m") (suc (var "l"))))
+            Nat
+            (Pi "_" (App (Var "m") (Var "l")) (App (Var "m") (Suc (Var "l"))))
           )
-          (pi "k" nat (app (var "m") (var "k")))
+          (Pi "k" Nat (App (Var "m") (Var "k")))
         )
       )
     )
@@ -48,18 +44,18 @@ preludeTypes =
   --                   (f : forall (x : a) (y : b). c)
   --                   (p : a*b). c
   , ( "prodElim"
-    , pi
+    , Pi
       "a"
-      type_
-      (pi
+      Type
+      (Pi
         "b"
-        type_
-        (pi
+        Type
+        (Pi
           "c"
-          type_
-          (pi "f"
-              (pi "x" (var "a") (pi "y" (var "b") (var "c")))
-              (pi "p" (prod (var "a") (var "b")) (var "c"))
+          Type
+          (Pi "f"
+              (Pi "x" (Var "a") (Pi "y" (Var "b") (Var "c")))
+              (Pi "p" (Prod (Var "a") (Var "b")) (Var "c"))
           )
         )
       )
@@ -69,21 +65,21 @@ preludeTypes =
   --                  (g : forall (y : b). c)
   --                  (s : a|b). c
   , ( "sumElim"
-    , pi
+    , Pi
       "a"
-      type_
-      (pi
+      Type
+      (Pi
         "b"
-        type_
-        (pi
+        Type
+        (Pi
           "c"
-          type_
-          (pi
+          Type
+          (Pi
             "f"
-            (pi "x" (var "a") (var "c"))
-            (pi "g"
-                (pi "y" (var "b") (var "c"))
-                (pi "s" (sum (var "a") (var "b")) (var "c"))
+            (Pi "x" (Var "a") (Var "c"))
+            (Pi "g"
+                (Pi "y" (Var "b") (Var "c"))
+                (Pi "s" (Sum (Var "a") (Var "b")) (Var "c"))
             )
           )
         )
@@ -96,33 +92,33 @@ preludeTypes =
   --                   (f : forall (x : a) (l : List a) (rec : m l). m (x :: l).
   --                   m l
   , ( "listElim"
-    , pi
+    , Pi
       "a"
-      type_
-      (pi
+      Type
+      (Pi
         "m"
-        (pi "l" (list (var "a")) type_)
-        (pi
+        (Pi "l" (List (Var "a")) Type)
+        (Pi
           "l"
-          (list (var "a"))
-          (pi
+          (List (Var "a"))
+          (Pi
             "s"
-            (app (var "m") lnil)
-            (pi
+            (App (Var "m") LNil)
+            (Pi
               "f"
-              (pi
+              (Pi
                 "x"
-                (var "a")
-                (pi
+                (Var "a")
+                (Pi
                   "l"
-                  (list (var "a"))
-                  (pi "rec"
-                      (app (var "m") (var "l"))
-                      (app (var "m") (lcons (var "x") (var "l")))
+                  (List (Var "a"))
+                  (Pi "rec"
+                      (App (Var "m") (Var "l"))
+                      (App (Var "m") (LCons (Var "x") (Var "l")))
                   )
                 )
               )
-              (app (var "m") (var "l"))
+              (App (Var "m") (Var "l"))
             )
           )
         )
@@ -134,30 +130,30 @@ preludeTypes =
   --                  (n : Nat)
   --                  (f : Fin n). m n f
   , ( "finElim"
-    , pi
+    , Pi
       "m"
-      (pi "n1" nat (pi "f" (fin (var "n1")) type_))
-      (pi
+      (Pi "n1" Nat (Pi "f" (Fin (Var "n1")) Type))
+      (Pi
         "mz"
-        (pi "n2" nat (app (app (var "m") (suc (var "n2"))) (fzero (var "n2"))))
-        (pi
+        (Pi "n2" Nat (App (App (Var "m") (Suc (Var "n2"))) (FZero (Var "n2"))))
+        (Pi
           "ms"
-          (pi
+          (Pi
             "n3"
-            nat
-            (pi
+            Nat
+            (Pi
               "f"
-              (fin (var "n3"))
-              (pi "rec"
-                  (app (app (var "m") (var "n3")) (var "f"))
-                  (app (app (var "m") (suc (var "n3"))) (fsuc (var "f")))
+              (Fin (Var "n3"))
+              (Pi "rec"
+                  (App (App (Var "m") (Var "n3")) (Var "f"))
+                  (App (App (Var "m") (Suc (Var "n3"))) (FSuc (Var "f")))
               )
             )
           )
-          (pi
+          (Pi
             "n4"
-            nat
-            (pi "f" (fin (var "n4")) (app (app (var "m") (var "n4")) (var "f")))
+            Nat
+            (Pi "f" (Fin (Var "n4")) (App (App (Var "m") (Var "n4")) (Var "f")))
           )
         )
       )

@@ -1,7 +1,3 @@
-import           Prelude                 hiding ( pi
-                                                , sum
-                                                )
-
 import           Test.Hspec
 import           Test.Hspec.Megaparsec
 
@@ -22,204 +18,199 @@ import           Eval                           ( evalExpr )
 main :: IO ()
 main = hspec $ do
   describe "Parsing" $ do
-    "x" ~> var "x"
-    "Type" ~> type_
-    "\\x. x" ~> lam "x" (var "x")
-    "forall (x : Type). x" ~> pi "x" type_ (var "x")
-    "(\\x. x) y" ~> app (lam "x" (var "x")) (var "y")
-    "(\\x y. x) z" ~> app (lam "x" (lam "y" (var "x"))) (var "z")
-    "x : Type" ~> ann (var "x") type_
+    "x" ~> Var "x"
+    "Type" ~> Type
+    "\\x. x" ~> Lam "x" (Var "x")
+    "forall (x : Type). x" ~> Pi "x" Type (Var "x")
+    "(\\x. x) y" ~> App (Lam "x" (Var "x")) (Var "y")
+    "(\\x y. x) z" ~> App (Lam "x" (Lam "y" (Var "x"))) (Var "z")
+    "x : Type" ~> Ann (Var "x") Type
     "((\\x. x) : forall (x : Type). Type) Type"
-      ~> app (ann (lam "x" (var "x")) (pi "x" type_ type_)) type_
-    "forall (x : Type) (y : Type). x" ~> pi "x" type_ (pi "y" type_ (var "x"))
-    "Nat" ~> nat
-    "Zero" ~> zero
-    "Suc Zero" ~> suc zero
-    "natElim m mz ms k" ~> app
-      (app (app (app (var "natElim") (var "m")) (var "mz")) (var "ms"))
-      (var "k")
-    "Nat*Nat" ~> prod nat nat
-    "Zero*(Suc Zero)" ~> prod zero (suc zero)
-    "prodElim Nat Nat Nat (\\a b. a) (Zero*Zero)" ~> app
-      (app (app (app (app (var "prodElim") nat) nat) nat)
-           (lam "a" (lam "b" (var "a")))
+      ~> App (Ann (Lam "x" (Var "x")) (Pi "x" Type Type)) Type
+    "forall (x : Type) (y : Type). x" ~> Pi "x" Type (Pi "y" Type (Var "x"))
+    "Nat" ~> Nat
+    "Zero" ~> Zero
+    "Suc Zero" ~> Suc Zero
+    "natElim m mz ms k" ~> App
+      (App (App (App (Var "natElim") (Var "m")) (Var "mz")) (Var "ms"))
+      (Var "k")
+    "Nat*Nat" ~> Prod Nat Nat
+    "Zero*(Suc Zero)" ~> Prod Zero (Suc Zero)
+    "prodElim Nat Nat Nat (\\a b. a) (Zero*Zero)" ~> App
+      (App (App (App (App (Var "prodElim") Nat) Nat) Nat)
+           (Lam "a" (Lam "b" (Var "a")))
       )
-      (prod zero zero)
-    "Nat|Nat" ~> sum nat nat
-    "Nat|(Nat|Type)" ~> sum nat (sum nat type_)
-    "Nat|(Nat*Type)" ~> sum nat (prod nat type_)
-    "Left Zero" ~> suml zero
-    "sumElim Type Nat Nat (\\a. Zero) (\\b. Zero) (Left Type)" ~> app
-      (app
-        (app (app (app (app (var "sumElim") type_) nat) nat) (lam "a" zero))
-        (lam "b" zero)
+      (Prod Zero Zero)
+    "Nat|Nat" ~> Sum Nat Nat
+    "Nat|(Nat|Type)" ~> Sum Nat (Sum Nat Type)
+    "Nat|(Nat*Type)" ~> Sum Nat (Prod Nat Type)
+    "Left Zero" ~> SumL Zero
+    "sumElim Type Nat Nat (\\a. Zero) (\\b. Zero) (Left Type)" ~> App
+      (App (App (App (App (App (Var "sumElim") Type) Nat) Nat) (Lam "a" Zero))
+           (Lam "b" Zero)
       )
-      (suml type_)
-    "[Zero, Zero]" ~> lcons zero (lcons zero lnil)
-    "T" ~> tt
-    "Void" ~> void
-    "Unit" ~> unit
-    "I Nat Zero Zero" ~> equal nat zero zero
-    "Refl Zero" ~> refl zero
-    "eqElim Nat (\\x y eq. Nat) (\\x. Zero) Zero Zero (Refl Zero)" ~> eqElim
-      nat
-      (lam "x" (lam "y" (lam "eq" nat)))
-      (lam "x" zero)
-      zero
-      zero
-      (refl zero)
-    "eqElim T T T T T T T" ~> app (eqElim tt tt tt tt tt tt) tt
-    "W a b" ~> w (var "a") (var "b")
-    "sup a b" ~> sup (var "a") (var "b")
-    "absurd Nat" ~> absurd nat
-    "Fin Zero" ~> fin zero
-    "FZero Zero" ~> fzero zero
-    "FSuc (FZero Zero)" ~> fsuc (fzero zero)
+      (SumL Type)
+    "[Zero, Zero]" ~> LCons Zero (LCons Zero LNil)
+    "T" ~> T
+    "Void" ~> Void
+    "Unit" ~> Unit
+    "I Nat Zero Zero" ~> Equal Nat Zero Zero
+    "Refl Zero" ~> Refl Zero
+    "eqElim Nat (\\x y eq. Nat) (\\x. Zero) Zero Zero (Refl Zero)" ~> EqElim
+      Nat
+      (Lam "x" (Lam "y" (Lam "eq" Nat)))
+      (Lam "x" Zero)
+      Zero
+      Zero
+      (Refl Zero)
+    "eqElim T T T T T T T" ~> App (EqElim T T T T T T) T
+    "W a b" ~> W (Var "a") (Var "b")
+    "sup a b" ~> Sup (Var "a") (Var "b")
+    "absurd Nat" ~> Absurd Nat
+    "Fin Zero" ~> Fin Zero
+    "FZero Zero" ~> FZero Zero
+    "FSuc (FZero Zero)" ~> FSuc (FZero Zero)
 
   describe "Inference" $ do
-    "Type" ~~ type_
-    "(\\t. t) : forall (t : Type). Type" ~~ pi "t" type_ type_
+    "Type" ~~ Type
+    "(\\t. t) : forall (t : Type). Type" ~~ Pi "t" Type Type
     -- id
     "(\\t x. x) : forall (t : Type) (x : t). t"
-      ~~ pi "t" type_ (pi "x" (var "t") (var "t"))
+      ~~ Pi "t" Type (Pi "x" (Var "t") (Var "t"))
     -- const
     "(\\t1 x t2 y. x) : forall (t1 : Type) (x : t1) (t2 : Type) (y : t2). t1"
-      ~~ pi "t1"
-            type_
-            (pi "x" (var "t1") (pi "t2" type_ (pi "y" (var "t2") (var "t1"))))
+      ~~ Pi "t1"
+            Type
+            (Pi "x" (Var "t1") (Pi "t2" Type (Pi "y" (Var "t2") (Var "t1"))))
     -- (Type -> Type) Type
-    "((\\t. t) : forall (t : Type). Type) Type" ~~ type_
+    "((\\t. t) : forall (t : Type). Type) Type" ~~ Type
     -- id Type Type
-    "((\\t x. x) : forall (t : Type) (x : t). t) Type Type" ~~ type_
+    "((\\t x. x) : forall (t : Type) (x : t). t) Type Type" ~~ Type
 
     -- function application
     "(\\a b f x. f x) : forall (a : Type) (b : Type) (f : forall (x : a). b) (x : a). b"
-      ~~ pi
+      ~~ Pi
            "a"
-           type_
-           (pi
+           Type
+           (Pi
              "b"
-             type_
-             (pi "f" (pi "x" (var "a") (var "b")) (pi "x" (var "a") (var "b")))
+             Type
+             (Pi "f" (Pi "x" (Var "a") (Var "b")) (Pi "x" (Var "a") (Var "b")))
            )
 
     -- S combinator specialised to a single type
     "(\\a x y z. x z (y z)) : forall (a : Type) (x : forall (z : a) (yz : a). a) (y : forall (z : a). a) (z : a). a"
-      ~~ pi
+      ~~ Pi
            "a"
-           type_
-           (pi
+           Type
+           (Pi
              "x"
-             (pi "z" (var "a") (pi "yz" (var "a") (var "a")))
-             (pi "y" (pi "z" (var "a") (var "a")) (pi "z" (var "a") (var "a")))
+             (Pi "z" (Var "a") (Pi "yz" (Var "a") (Var "a")))
+             (Pi "y" (Pi "z" (Var "a") (Var "a")) (Pi "z" (Var "a") (Var "a")))
            )
 
     -- S combinator generalised over several types
     "(\\a b c x y z. x z (y z)) : forall (a : Type) (b : Type) (c : Type) (x : forall (z : a) (yz : b). c) (y : forall (z : a). b) (z : a). c"
-      ~~ pi
+      ~~ Pi
            "a"
-           type_
-           (pi
+           Type
+           (Pi
              "b"
-             type_
-             (pi
+             Type
+             (Pi
                "c"
-               type_
-               (pi
+               Type
+               (Pi
                  "x"
-                 (pi "z" (var "a") (pi "yz" (var "b") (var "c")))
-                 (pi "y"
-                     (pi "z" (var "a") (var "b"))
-                     (pi "z" (var "a") (var "c"))
+                 (Pi "z" (Var "a") (Pi "yz" (Var "b") (Var "c")))
+                 (Pi "y"
+                     (Pi "z" (Var "a") (Var "b"))
+                     (Pi "z" (Var "a") (Var "c"))
                  )
                )
              )
            )
 
     -- Nats
-    "Nat" ~~ type_
-    "Zero" ~~ nat
-    "Suc Zero" ~~ nat
+    "Nat" ~~ Type
+    "Zero" ~~ Nat
+    "Suc Zero" ~~ Nat
     "natElim ((\\n. Nat) : forall (n : Nat). Type) Zero ((\\k n. n) : forall (k : Nat) (n : Nat). Nat) (Suc Zero)"
-      ~~ nat
+      ~~ Nat
     "natElim ((\\n. Nat) : forall (n : Nat). Type) (Suc Zero) ((\\k n. Suc n) : forall (k : Nat) (n : Nat). Nat) (Suc (Suc Zero))"
-      ~~ nat
+      ~~ Nat
 
     -- Product
-    "Type*Type" ~~ type_
-    "Nat*Nat" ~~ type_
-    "Zero*Zero" ~~ prod nat nat
-    "Zero*Type" ~~ prod nat type_
-    "Zero*(Zero*Zero)" ~~ prod nat (prod nat nat)
+    "Type*Type" ~~ Type
+    "Nat*Nat" ~~ Type
+    "Zero*Zero" ~~ Prod Nat Nat
+    "Zero*Type" ~~ Prod Nat Type
+    "Zero*(Zero*Zero)" ~~ Prod Nat (Prod Nat Nat)
     "prodElim Nat Nat Nat ((\\a b. a) : forall (a : Nat) (b : Nat). Nat) (Zero*Zero)"
-      ~~ nat
+      ~~ Nat
     "prodElim Nat Type Type ((\\a b. b) : forall (a : Nat) (b : Type). Type) (Zero*Nat)"
-      ~~ type_
+      ~~ Type
     -- uncurry
     "(\\a b c f p. prodElim a b c f p) : forall (a : Type) (b : Type) (c : Type) (f : forall (x : a) (y : b). c) (p : a*b). c"
-      ~~ pi
+      ~~ Pi
            "a"
-           type_
-           (pi
+           Type
+           (Pi
              "b"
-             type_
-             (pi
+             Type
+             (Pi
                "c"
-               type_
-               (pi "f"
-                   (pi "x" (var "a") (pi "y" (var "b") (var "c")))
-                   (pi "p" (prod (var "a") (var "b")) (var "c"))
+               Type
+               (Pi "f"
+                   (Pi "x" (Var "a") (Pi "y" (Var "b") (Var "c")))
+                   (Pi "p" (Prod (Var "a") (Var "b")) (Var "c"))
                )
              )
            )
     -- fst
     "(\\a b p. prodElim a b a ((\\x y. x) : forall (x : a) (y : b). a) p) : forall (a : Type) (b : Type) (p : a*b). a"
-      ~~ pi "a"
-            type_
-            (pi "b" type_ (pi "p" (prod (var "a") (var "b")) (var "a")))
+      ~~ Pi "a" Type (Pi "b" Type (Pi "p" (Prod (Var "a") (Var "b")) (Var "a")))
     -- snd
     "(\\a b p. prodElim a b b ((\\x y. y) : forall (x : a) (y : b). b) p) : forall (a : Type) (b : Type) (p : a*b). b"
-      ~~ pi "a"
-            type_
-            (pi "b" type_ (pi "p" (prod (var "a") (var "b")) (var "b")))
+      ~~ Pi "a" Type (Pi "b" Type (Pi "p" (Prod (Var "a") (Var "b")) (Var "b")))
 
     -- Sum
-    "(Nat|Type)" ~~ type_
-    "(Nat|(Nat*Nat))" ~~ type_
-    "(Left Zero) : (Nat|Type)" ~~ sum nat type_
-    "sumElim Nat Nat Nat (\\x. Zero) (\\x. Zero) (Left Zero))" ~~ nat
+    "(Nat|Type)" ~~ Type
+    "(Nat|(Nat*Nat))" ~~ Type
+    "(Left Zero) : (Nat|Type)" ~~ Sum Nat Type
+    "sumElim Nat Nat Nat (\\x. Zero) (\\x. Zero) (Left Zero))" ~~ Nat
 
     -- List
-    "List Nat" ~~ type_
-    "[Zero, Zero]" ~~ list nat
-    "[] : List Nat" ~~ list nat
-    "[[Zero, Zero]]" ~~ list (list nat)
+    "List Nat" ~~ Type
+    "[Zero, Zero]" ~~ List Nat
+    "[] : List Nat" ~~ List Nat
+    "[[Zero, Zero]]" ~~ List (List Nat)
     "listElim Nat ((\\l. Nat) : forall (l : List Nat). Type) [Zero, Zero] Zero ((\\x xs acc. Suc acc) : forall (x : Nat) (xs : List Nat) (acc : Nat). Nat)"
-      ~~ nat
+      ~~ Nat
 
     -- Unit and Bottom
-    "T" ~~ type_
-    "Void" ~~ type_
-    "Unit" ~~ tt
+    "T" ~~ Type
+    "Void" ~~ Type
+    "Unit" ~~ T
 
     -- Equality
-    "I Nat Zero Zero" ~~ type_
-    "Refl Zero" ~~ equal nat zero zero
-    "eqElim Nat (\\x y eq. Nat) (\\x. Zero) Zero Zero (Refl Zero)" ~~ nat
+    "I Nat Zero Zero" ~~ Type
+    "Refl Zero" ~~ Equal Nat Zero Zero
+    "eqElim Nat (\\x y eq. Nat) (\\x. Zero) Zero Zero (Refl Zero)" ~~ Nat
 
     -- W
-    "W T (\\x. T)" ~~ type_
+    "W T (\\x. T)" ~~ Type
     "sup Unit ((\\x. absurd (W T (\\x. Void))) : forall (x : Void). W T (\\x. Void))"
-      ~~ w tt (lam "x" void)
+      ~~ W T (Lam "x" Void)
 
     -- Fin
-    "Fin Zero" ~~ type_
-    "FZero Zero" ~~ fin (suc zero)
-    "FSuc (FZero Zero)" ~~ fin (suc (suc zero))
-    "FZero (Suc Zero)" ~~ fin (suc (suc zero))
-    "FZero (Suc Zero)" ~~ fin (suc (suc zero))
+    "Fin Zero" ~~ Type
+    "FZero Zero" ~~ Fin (Suc Zero)
+    "FSuc (FZero Zero)" ~~ Fin (Suc (Suc Zero))
+    "FZero (Suc Zero)" ~~ Fin (Suc (Suc Zero))
+    "FZero (Suc Zero)" ~~ Fin (Suc (Suc Zero))
     "finElim (\\a b. Nat) (\\a. Zero) (\\a b rec. Suc rec) (Suc Zero) (FZero Zero)"
-      ~~ nat
+      ~~ Nat
 
     -- Rejections
     -- unannotated lambdas are forbidden

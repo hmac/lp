@@ -4,7 +4,7 @@
 module Expr.Pretty where
 
 import           Data.Functor.Foldable
-import           Expr
+import           Expr.Base
 import           Pretty
 
 instance Pretty (Fix (ExprF String String)) where

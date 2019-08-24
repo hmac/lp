@@ -1,9 +1,5 @@
 module Parse where
 
-import           Prelude                 hiding ( pi
-                                                , product
-                                                , sum
-                                                )
 import           Data.Void                      ( Void )
 
 import           Text.Megaparsec
@@ -35,7 +31,7 @@ definition = do
   _       <- string "\n"
   _       <- string (name ++ " = ")
   e       <- expr
-  pure $ Def name (ann e typeAnn)
+  pure $ Def name (Ann e typeAnn)
 
 comment :: Parser String
 comment = string "--" >> many (noneOf ['\n']) >> eol
@@ -46,7 +42,7 @@ expr :: Parser Expr
 expr = try annotation <|> try infixOperator <|> application <|> aexpr
 
 application :: Parser Expr
-application = foldl1 app <$> (aexpr `sepBy` string " ")
+application = foldl1 App <$> (aexpr `sepBy` string " ")
 
 aexpr :: Parser Expr
 aexpr =
@@ -72,10 +68,10 @@ annotation :: Parser Expr
 annotation = do
   e <- aexpr
   _ <- string " : " -- space consumer
-  ann e <$> aexpr
+  Ann e <$> aexpr
 
 ptype :: Parser Expr
-ptype = string "Type" >> pure type_
+ptype = string "Type" >> pure Type
 
 lambda :: Parser Expr
 lambda = do
@@ -83,7 +79,7 @@ lambda = do
   xs <- termName `sepBy1` string " "
   _  <- string ". " -- space consumer
   e  <- expr
-  pure $ foldr lam e xs
+  pure $ foldr Lam e xs
 
 forall :: Parser Expr
 forall = do
@@ -91,7 +87,7 @@ forall = do
   vars <- forallVar `sepBy1` string " "
   _    <- string ". " -- space consumer
   e    <- expr
-  pure $ foldr (\(x, t) ex -> pi x t ex) e vars
+  pure $ foldr (\(x, t) ex -> Pi x t ex) e vars
 
 forallVar :: Parser (String, Expr)
 forallVar = parens $ do
@@ -103,60 +99,60 @@ forallVar = parens $ do
 naturals :: Parser Expr
 naturals = pNat <|> pZero <|> pSuc
  where
-  pNat  = string "Nat" >> pure nat
-  pZero = string "Zero" >> pure zero
-  pSuc  = string "Suc " >> suc <$> aexpr
+  pNat  = string "Nat" >> pure Nat
+  pZero = string "Zero" >> pure Zero
+  pSuc  = string "Suc " >> Suc <$> aexpr
 
 infixOperator :: Parser Expr
 infixOperator = do
   a <- aexpr
-  (string "*" >> prod a <$> expr)
-    <|> (string "|" >> sum a <$> expr)
-    <|> (string "::" >> lcons a <$> expr)
+  (string "*" >> Prod a <$> expr)
+    <|> (string "|" >> Sum a <$> expr)
+    <|> (string "::" >> LCons a <$> expr)
 
 pSumIntro :: Parser Expr
 pSumIntro =
-  (string "Left " >> suml <$> aexpr) <|> (string "Right " >> sumr <$> aexpr)
+  (string "Left " >> SumL <$> aexpr) <|> (string "Right " >> SumR <$> aexpr)
 
 top :: Parser Expr
-top = string "T" >> pure tt
+top = string "T" >> pure T
 
 bottom :: Parser Expr
-bottom = string "Void" >> pure void
+bottom = string "Void" >> pure Void
 
 pAbsurd :: Parser Expr
-pAbsurd = string "absurd " >> absurd <$> aexpr
+pAbsurd = string "absurd " >> Absurd <$> aexpr
 
 pUnit :: Parser Expr
-pUnit = string "Unit" >> pure unit
+pUnit = string "Unit" >> pure Unit
 
 pRefl :: Parser Expr
-pRefl = string "Refl " >> refl <$> aexpr
+pRefl = string "Refl " >> Refl <$> aexpr
 
 pEq :: Parser Expr
 pEq = do
   _         <- string "I"
   [t, a, b] <- sequenceA $ replicate 3 (string " " >> aexpr)
-  pure $ equal t a b
+  pure $ Equal t a b
 
 pEqElim :: Parser Expr
 pEqElim = do
   _                    <- string "eqElim"
   [a, m, mr, x, y, eq] <- sequenceA $ replicate 6 (string " " >> aexpr)
-  pure $ eqElim a m mr x y eq
+  pure $ EqElim a m mr x y eq
 
 pW :: Parser Expr
 pW = do
-  f      <- (string "W" >> pure w) <|> (string "sup" >> pure sup)
+  f      <- (string "W" >> pure W) <|> (string "sup" >> pure Sup)
   [a, b] <- sequenceA $ replicate 2 (string " " >> aexpr)
   pure $ f a b
 
 pFin :: Parser Expr
 pFin = pFinType <|> pFZero <|> pFSuc
  where
-  pFinType = string "Fin " >> fin <$> aexpr
-  pFZero   = string "FZero " >> fzero <$> aexpr
-  pFSuc    = string "FSuc " >> fsuc <$> aexpr
+  pFinType = string "Fin " >> Fin <$> aexpr
+  pFZero   = string "FZero " >> FZero <$> aexpr
+  pFSuc    = string "FSuc " >> FSuc <$> aexpr
 
 lists :: Parser Expr
 lists = pListType <|> pListNil <|> pList
@@ -164,18 +160,18 @@ lists = pListType <|> pListNil <|> pList
 pListType :: Parser Expr
 pListType = do
   _ <- string "List "
-  list <$> aexpr
+  List <$> aexpr
 
 pListNil :: Parser Expr
-pListNil = string "[]" >> pure lnil
+pListNil = string "[]" >> pure LNil
 
 pList :: Parser Expr
 pList = brackets $ do
   elems <- expr `sepBy` string ", "
-  pure $ foldr lcons lnil elems
+  pure $ foldr LCons LNil elems
 
 pvar :: Parser Expr
-pvar = var <$> termName
+pvar = Var <$> termName
 
 termName :: Parser String
 termName = some alphaNumChar

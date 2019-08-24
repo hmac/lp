@@ -1,10 +1,8 @@
 {-# LANGUAGE DerivingVia #-}
 module Infer where
 
-import           Prelude                 hiding ( pi )
 import qualified Data.Monoid                   as Monoid
                                                 ( Sum(..) )
-import           Data.Functor.Foldable
 import           Control.Monad.Trans.Reader
 import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.Class      ( lift
@@ -79,9 +77,9 @@ runCheck env expr t = runExcept (runReaderT (check expr t) env)
 infer :: Expr -> ReaderT Env (Except String) Expr
 
 -- ANN
-infer (Fix (Ann e t)) = label "ANN" $ do
+infer ((Ann e t)) = label "ANN" $ do
   trace "ANN"
-  check_ t (Fix Type)
+  check_ t (Type)
   (_types, vals, _, _) <- ask
   let t' = evalExpr vals t
   trace $ "t: " ++ pp t'
@@ -89,10 +87,10 @@ infer (Fix (Ann e t)) = label "ANN" $ do
   spy $ pure t'
 
 -- TYPE
-infer (Fix Type   ) = pure (Fix Type)
+infer (Type   ) = pure (Type)
 
 -- VAR
-infer (Fix (Var v)) = label "VAR" $ do
+infer ((Var v)) = label "VAR" $ do
   trace $ "VAR (" ++ v ++ ")"
   (types, _, _, _) <- ask
   case lookup v types of
@@ -105,25 +103,25 @@ infer (Fix (Var v)) = label "VAR" $ do
         <> show types
 
 -- PI
-infer (Fix (Pi x t e)) = label "PI" $ do
+infer ((Pi x t e)) = label "PI" $ do
   trace "PI"
-  check_ t (Fix Type)
+  check_ t (Type)
   (types, vals, d, debug) <- ask
   let t'   = evalExpr vals t
   let env' = ((x, t') : types, vals, d, debug)
-  _ <- local (const env') $ check_ e (Fix Type)
-  spy $ pure (Fix Type)
+  _ <- local (const env') $ check_ e (Type)
+  spy $ pure (Type)
 
 -- APP
-infer (Fix (App e e')) = label "APP" $ do
-  trace $ "APP " ++ pp (Fix (App e e'))
+infer ((App e e')) = label "APP" $ do
+  trace $ "APP " ++ pp ((App e e'))
   (types, vals, _, _) <- ask
   e_type              <- infer_ e
   trace $ "e: " ++ pp e
   trace $ "e': " ++ pp e'
   trace $ "e_type: " ++ pp e_type
   case e_type of
-    Fix (Pi x t t') -> do
+    (Pi x t t') -> do
       check_ e' t
       trace $ "x: " ++ pp x
       trace $ "e': " ++ pp e'
@@ -147,94 +145,94 @@ infer (Fix (App e e')) = label "APP" $ do
         <> " )"
 
 -- Nat
-infer (Fix Nat    ) = pure type_
-infer (Fix Zero   ) = pure nat
-infer (Fix (Suc n)) = label "SUC" $ do
-  check_ n nat
-  pure nat
+infer (Nat    ) = pure Type
+infer (Zero   ) = pure Nat
+infer ((Suc n)) = label "SUC" $ do
+  check_ n Nat
+  pure Nat
 
 -- Product
-infer (Fix (Prod (Fix Type) (Fix Type))) = pure type_
-infer (Fix (Prod a          b         )) = do
+infer ((Prod (Type) (Type))) = pure Type
+infer ((Prod a      b     )) = do
   ta <- infer_ a
   tb <- infer_ b
-  pure $ if ta == type_ && tb == type_ then type_ else prod ta tb
+  pure $ if ta == Type && tb == Type then Type else Prod ta tb
 
 -- Sum
-infer (Fix (Sum l r)) = do
-  check_ r type_
-  check_ l type_
-  pure type_
+infer ((Sum l r)) = do
+  check_ r Type
+  check_ l Type
+  pure Type
 
 -- List
-infer (Fix (List t)) = label "LIST" $ do
-  check_ t type_
-  pure type_
+infer ((List t)) = label "LIST" $ do
+  check_ t Type
+  pure Type
 -- If the list is a singleton, we can directly infer the type from the element
-infer (Fix (LCons x (Fix LNil))) = label "LCONS" $ do
+infer ((LCons x (LNil))) = label "LCONS" $ do
   t <- infer_ x
-  pure $ list t
-infer (Fix (LCons x xs)) = label "LCONS" $ do
+  pure $ List t
+infer ((LCons x xs)) = label "LCONS" $ do
   t <- infer_ xs
-  check (lcons x lnil) t
+  check (LCons x LNil) t
   pure t
 
 -- Unit and Bottom
-infer (Fix T            ) = pure type_
-infer (Fix Void         ) = pure type_
-infer (Fix (Absurd t)   ) = check t type_ >> pure t
-infer (Fix Unit         ) = pure tt
+infer (T            ) = pure Type
+infer (Void         ) = pure Type
+infer ((Absurd t)   ) = check t Type >> pure t
+infer (Unit         ) = pure T
 
 -- Equality
-infer (Fix (Equal t a b)) = label "EQ" $ do
-  check_ t type_
+infer ((Equal t a b)) = label "EQ" $ do
+  check_ t Type
   check_ a t
   check_ b t
-  pure type_
+  pure Type
 
-infer (Fix (Refl a)) = label "REFL" $ do
+infer ((Refl a)) = label "REFL" $ do
   t <- infer_ a
-  pure $ equal t a a
+  pure $ Equal t a a
 
-infer (Fix (EqElim a m mr x y eq)) = label "EQELIM" $ do
+infer ((EqElim a m mr x y eq)) = label "EQELIM" $ do
   (_, vals, _, _) <- ask
-  check a type_
-  check m $ pi "x" a (pi "y" a (pi "eq" (equal a (var "x") (var "y")) type_))
-  check mr $ pi "x" a (app (app (app m (var "x")) (var "x")) (refl (var "x")))
+  check a Type
+  check m $ Pi "x" a (Pi "y" a (Pi "eq" (Equal a (Var "x") (Var "y")) Type))
+  check mr $ Pi "x" a (App (App (App m (Var "x")) (Var "x")) (Refl (Var "x")))
   check x a
   check y a
-  check eq $ equal a x y
-  pure $ evalExpr vals $ app (app (app m x) y) eq
+  check eq $ Equal a x y
+  pure $ evalExpr vals $ App (App (App m x) y) eq
 
 -- W constructor
-infer (Fix (W a b)) = label "W" $ do
-  check_ a type_
-  check b (pi "x" a type_)
-  pure type_
-infer (Fix (Sup a b)) = label "SUP" $ do
+infer ((W a b)) = label "W" $ do
+  check_ a Type
+  check b (Pi "x" a Type)
+  pure Type
+infer ((Sup a b)) = label "SUP" $ do
   ta <- infer_ a
   tb <- infer_ b
   case tb of
-    Fix (Pi _ _ (Fix (W wa wb))) -> do
-      let tx = app wb a
-      check b (pi "_" tx (w ta wb))
-      pure (w wa wb)
+    (Pi _ _ ((W wa wb))) -> do
+      let tx = App wb a
+      check b (Pi "_" tx (W ta wb))
+      pure (W wa wb)
     t ->
       throw
         $  "expected "
         ++ pp b
         ++ " to have have a type of the form "
-        ++ pp (pi "_" (var "B(a)") (w (var "A") (var "B")))
+        ++ pp (Pi "_" (Var "B(a)") (W (Var "A") (Var "B")))
         ++ " but inferred it to have type "
         ++ pp t
 
 -- Fin
-infer (Fix (Fin   r)) = label "FIN" $ check_ r nat >> pure type_
-infer (Fix (FZero n)) = label "FZERO" $ check_ n nat >> pure (fin (suc n))
-infer (Fix (FSuc  f)) = label "FSUC" $ do
+infer ((Fin   r)) = label "FIN" $ check_ r Nat >> pure Type
+infer ((FZero n)) = label "FZERO" $ check_ n Nat >> pure (Fin (Suc n))
+infer ((FSuc  f)) = label "FSUC" $ do
   ft <- infer_ f
   case ft of
-    (Fix (Fin n)) -> pure (fin (suc n))
+    ((Fin n)) -> pure (Fin (Suc n))
     t ->
       throw
         $  "expected "
@@ -248,13 +246,13 @@ infer e = throw $ "could not infer type of " <> pp e
 check :: Expr -> Expr -> ReaderT Env (Except String) ()
 
 -- Short-circuit for the most common use of check
-check (Fix Type     ) (Fix Type        ) = pure ()
+check (Type     ) (Type        ) = pure ()
 
 -- LAM
-check (Fix (Lam x e)) (Fix (Pi x' t t')) = label "LAM" $ do
-  trace $ "LAM " ++ pp (Fix (Lam x e)) ++ " : " ++ pp (Fix (Pi x' t t'))
+check ((Lam x e)) ((Pi x' t t')) = label "LAM" $ do
+  trace $ "LAM " ++ pp ((Lam x e)) ++ " : " ++ pp ((Pi x' t t'))
   (types, vals, d, debug) <- ask
-  check_ (evalExpr vals t) (Fix Type)
+  check_ (evalExpr vals t) (Type)
   -- Assume (x : t) and (x' : t) and add this to the environment when checking (e : t')
   let env' = ((x, t) : (x', t) : types, vals, d, debug)
   trace $ "env': " ++ show env'
@@ -263,10 +261,10 @@ check (Fix (Lam x e)) (Fix (Pi x' t t')) = label "LAM" $ do
   _ <- local (const env') $ check_ e t'
   pure ()
 
-check (Fix (SumL l)) (Fix (Sum lt _ )) = label "SUML" $ check_ l lt
-check (Fix (SumR r)) (Fix (Sum _  rt)) = label "SUMR" $ check_ r rt
+check ((SumL l)) ((Sum lt _ )) = label "SUML" $ check_ l lt
+check ((SumR r)) ((Sum _  rt)) = label "SUMR" $ check_ r rt
 
-check (Fix LNil    ) (Fix (List t   )) = label "LNIL" $ check t type_
+check (LNil    ) ((List t   )) = label "LNIL" $ check t Type
 
 -- 𝚪 ⊢ e :↑ t
 ------------- (CHK)
@@ -276,7 +274,7 @@ check (Fix LNil    ) (Fix (List t   )) = label "LNIL" $ check t type_
 -- convert them to BExprs (de Bruijn indexed) and directly compare them for
 -- structural equality.
 -- This means we can ignore differences in variable names.
-check e              t                 = label "CHK" $ do
+check e          t             = label "CHK" $ do
   env <- ask
   trace $ "CHK " ++ pp e ++ " : " ++ pp t
   let (types, vals, _, _) = env
