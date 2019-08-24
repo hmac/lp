@@ -178,38 +178,6 @@ infer (Fix (LCons x xs)) = label "LCONS" $ do
   t <- infer_ xs
   check (lcons x lnil) t
   pure t
--- l : List A
--- m : (l : List A). Type
--- s : m []
--- f : forall (x : A) (l : List A) (_ : m l). m (x :: l)
--- -----------------------------------------------------
--- listElim m l s f : m l
-infer (Fix (ListElim m l s f)) = label "LELIM" $ do
-  (_, vals, _, _) <- ask
-  lt              <- infer_ l
-  case lt of
-    Fix (List a) -> do
-      check_ m (pi "l" lt type_)
-      check s (app m lnil)
-      check
-        f
-        (pi
-          "x"
-          a
-          (pi "l"
-              lt
-              (pi "_" (app m (var "l")) (app m (lcons (var "x") (var "l"))))
-          )
-        )
-      pure $ evalExpr vals (app m l)
-    t ->
-      throw
-        $  "expected "
-        ++ pp l
-        ++ " to have type "
-        ++ pp (list (var "<some type>"))
-        ++ " but inferred it to have type "
-        ++ pp t
 
 -- Unit and Bottom
 infer (Fix T            ) = pure type_

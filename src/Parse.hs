@@ -163,7 +163,7 @@ pFin = pFinType <|> pFZero <|> pFSuc <|> pFinElim
     pure $ finElim m mz ms n f
 
 lists :: Parser Expr
-lists = pListType <|> pListNil <|> pList <|> pListElim
+lists = pListType <|> pListNil <|> pList
 
 pListType :: Parser Expr
 pListType = do
@@ -177,12 +177,6 @@ pList :: Parser Expr
 pList = brackets $ do
   elems <- expr `sepBy` string ", "
   pure $ foldr lcons lnil elems
-
-pListElim :: Parser Expr
-pListElim = do
-  _            <- string "listElim"
-  [m, l, s, f] <- sequenceA $ replicate 4 (string " " >> aexpr)
-  pure $ listElim m l s f
 
 pvar :: Parser Expr
 pvar = var <$> termName

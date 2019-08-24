@@ -31,7 +31,7 @@ instance Pretty (Fix (ExprF String String)) where
       List t               -> "List" <+> t
       LNil                 -> "Nil"
       LCons x xs           -> x <+> "::" <+> xs
-      ListElim m l s g     -> "ListElim" <+> m <+> l <+> s <+> g
+      ListElim             -> "listElim"
       T                    -> "T"
       Unit                 -> "Unit"
       Void                 -> "Void"
@@ -70,7 +70,7 @@ instance Pretty (Fix (ExprF () Int)) where
       List t               -> "List" <+> t
       LNil                 -> "Nil"
       LCons x xs           -> x <+> "::" <+> xs
-      ListElim m l s g     -> "ListElim" <+> m <+> l <+> s <+> g
+      ListElim             -> "listElim"
       T                    -> "T"
       Unit                 -> "Unit"
       Void                 -> "Void"

@@ -36,7 +36,7 @@ data ExprF b x r -- r: inductive type, b: binder type, x: variable type
   | List r
   | LNil
   | LCons r r
-  | ListElim r r r r
+  | ListElim
   | T    -- T : Type
   | Unit -- Unit : T
   | Void
@@ -115,9 +115,6 @@ lnil = Fix LNil
 
 lcons :: Expr -> Expr -> Expr
 lcons x xs = Fix $ LCons x xs
-
-listElim :: Expr -> Expr -> Expr -> Expr -> Expr
-listElim m l s f = Fix $ ListElim m l s f
 
 tt :: Expr
 tt = Fix T
@@ -229,12 +226,6 @@ safeTranslate context = go (sort (map fst context))
       x'  <- go ctx x
       xs' <- go ctx xs
       pure $ Fix $ LCons x' xs'
-    Fix (ListElim m l s f) -> do
-      m' <- go ctx m
-      l' <- go ctx l
-      s' <- go ctx s
-      f' <- go ctx f
-      pure $ Fix $ ListElim m' l' s' f'
     Fix T             -> pure $ Fix T
     Fix Unit          -> pure $ Fix Unit
     Fix Void          -> pure $ Fix Void
@@ -292,6 +283,7 @@ preludeVals =
   [ ("natElim" , Fix NatElim)
   , ("prodElim", Fix ProdElim)
   , ("sumElim" , Fix SumElim)
+  , ("listElim", Fix ListElim)
   ]
 
 -- Builtin function types
@@ -359,6 +351,45 @@ preludeTypes =
             (pi "g"
                 (pi "y" (var "b") (var "c"))
                 (pi "s" (sum (var "a") (var "b")) (var "c"))
+            )
+          )
+        )
+      )
+    )
+  -- listElim : forall (a : Type)
+  --                   (l : List a)
+  --                   (m : forall (l : List a). Type)
+  --                   (s : m [])
+  --                   (f : forall (x : a) (l : List a) (rec : m l). m (x :: l).
+  --                   m l
+  , ( "listElim"
+    , pi
+      "a"
+      type_
+      (pi
+        "m"
+        (pi "l" (list (var "a")) type_)
+        (pi
+          "l"
+          (list (var "a"))
+          (pi
+            "s"
+            (app (var "m") lnil)
+            (pi
+              "f"
+              (pi
+                "x"
+                (var "a")
+                (pi
+                  "l"
+                  (list (var "a"))
+                  (pi "rec"
+                      (app (var "m") (var "l"))
+                      (app (var "m") (lcons (var "x") (var "l")))
+                  )
+                )
+              )
+              (app (var "m") (var "l"))
             )
           )
         )

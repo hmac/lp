@@ -193,7 +193,7 @@ main = hspec $ do
     "[Zero, Zero]" ~~ list nat
     "[] : List Nat" ~~ list nat
     "[[Zero, Zero]]" ~~ list (list nat)
-    "listElim ((\\l. Nat) : forall (l : List Nat). Type) [Zero, Zero] Zero ((\\x xs acc. Suc acc) : forall (x : Nat) (xs : List Nat) (acc : Nat). Nat)"
+    "listElim Nat ((\\l. Nat) : forall (l : List Nat). Type) [Zero, Zero] Zero ((\\x xs acc. Suc acc) : forall (x : Nat) (xs : List Nat) (acc : Nat). Nat)"
       ~~ nat
 
     -- Unit and Bottom
@@ -265,7 +265,7 @@ main = hspec $ do
     "sumElim Nat Nat Nat ((\\x. Zero) : forall (x : Nat). Nat) ((\\x. Zero) : forall (x : Nat). Nat) ((Left Zero) : (Nat|Nat))"
       ~* "Zero"
     -- list length
-    "listElim ((\\l. Nat) : forall (l : List Nat). Type) [Zero, Zero] Zero ((\\x xs acc. Suc acc) : forall (x : Nat) (xs : List Nat) (acc : Nat). Nat)"
+    "listElim Nat ((\\l. Nat) : forall (l : List Nat). Type) [Zero, Zero] Zero ((\\x xs acc. Suc acc) : forall (x : Nat) (xs : List Nat) (acc : Nat). Nat)"
       ~* "Suc (Suc Zero)"
     "eqElim Nat (\\x y eq. Nat) (\\x. Zero) Zero Zero (Refl Zero)" ~* "Zero"
     "finElim (\\a b. Nat) (\\a. Zero) (\\a b rec. Suc rec) (Suc Zero) (FZero Zero)"

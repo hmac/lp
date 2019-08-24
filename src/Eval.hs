@@ -31,6 +31,8 @@ reduce' ctx = go
       -> evalProdElim ctx f p
     Fix (App (Fix (App (Fix (App (Fix (App (Fix (App (Fix (App (Fix SumElim) _a)) _b)) _c)) f)) g)) s)
       -> evalSumElim ctx f g s
+    Fix (App (Fix (App (Fix (App (Fix (App (Fix (App (Fix ListElim) _a)) l)) m)) s)) f)
+      -> evalListElim ctx l m s f
     Fix (App a b) -> Fix (App (go a) (go b))
     -- When eval'ing under a lambda, we add the lambda's binding to the
     -- environment with a value of (Var <binding>) to ensure that we don't
@@ -67,11 +69,7 @@ reduce' ctx = go
 
     Fix (List t                          ) -> list (go t)
     Fix LNil                               -> lnil
-    Fix (LCons x xs               )        -> lcons (go x) (go xs)
-    Fix (ListElim _ (Fix LNil) s _)        -> s
-    Fix (ListElim m (Fix (LCons x xs)) s f) ->
-      app (app (app f x) xs) (listElim m xs s f)
-    Fix (ListElim m l s f)                 -> listElim m (go l) s f
+    Fix (LCons x xs)                       -> lcons (go x) (go xs)
 
     Fix T                                  -> Fix T
     Fix Unit                               -> Fix Unit
@@ -100,6 +98,12 @@ evalSumElim :: Context -> Expr -> Expr -> Expr -> Expr
 evalSumElim _   f _ (Fix (SumL l)) = app f l
 evalSumElim _   _ g (Fix (SumR r)) = app g r
 evalSumElim ctx f g s              = evalSumElim ctx f g (reduce' ctx s)
+
+evalListElim :: Context -> Expr -> Expr -> Expr -> Expr -> Expr
+evalListElim _ _ (Fix LNil) s _ = s
+evalListElim ctx m (Fix (LCons x xs)) s f =
+  app (app (app f x) xs) (evalListElim ctx m xs s f)
+evalListElim ctx m l s f = evalListElim ctx m (reduce' ctx l) s f
 
 substitute :: String -> Expr -> Expr -> Expr
 substitute v a b = topDown' alg a
