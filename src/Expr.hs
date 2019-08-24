@@ -28,7 +28,7 @@ data ExprF b x r -- r: inductive type, b: binder type, x: variable type
   | Zero
   | Suc r
   | Prod r r
-  | ProdElim r r
+  | ProdElim
   | Sum r r
   | SumL r
   | SumR r
@@ -97,9 +97,6 @@ suc = Fix . Suc
 
 prod :: Expr -> Expr -> Expr
 prod a b = Fix $ Prod a b
-
-prodElim :: Expr -> Expr -> Expr
-prodElim f p = Fix $ ProdElim f p
 
 sum :: Expr -> Expr -> Expr
 sum l r = Fix $ Sum l r
@@ -217,10 +214,6 @@ safeTranslate context = go (sort (map fst context))
       a' <- go ctx a
       b' <- go ctx b
       pure $ Fix $ Prod a' b'
-    Fix (ProdElim f p) -> do
-      f' <- go ctx f
-      p' <- go ctx p
-      pure $ Fix $ ProdElim f' p'
     Fix (Sum l r) -> do
       l' <- go ctx l
       r' <- go ctx r
@@ -303,7 +296,7 @@ prelude = (preludeTypes, preludeVals)
 
 -- Builtin functions
 preludeVals :: Context
-preludeVals = [("natElim", Fix NatElim)]
+preludeVals = [("natElim", Fix NatElim), ("prodElim", Fix ProdElim)]
 
 -- Builtin function types
 preludeTypes :: Context
@@ -327,6 +320,24 @@ preludeTypes =
             (pi "_" (app (var "m") (var "l")) (app (var "m") (suc (var "l"))))
           )
           (pi "k" nat (app (var "m") (var "k")))
+        )
+      )
+    )
+    -- prodElim : forall (a : Type) (b : Type) (c : Type). forall (f : forall (x : a) (y : b). c) (p : a*b). c
+  , ( "prodElim"
+    , pi
+      "a"
+      type_
+      (pi
+        "b"
+        type_
+        (pi
+          "c"
+          type_
+          (pi "f"
+              (pi "x" (var "a") (pi "y" (var "b") (var "c")))
+              (pi "p" (prod (var "a") (var "b")) (var "c"))
+          )
         )
       )
     )

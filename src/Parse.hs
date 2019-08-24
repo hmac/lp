@@ -54,7 +54,6 @@ aexpr =
     <|> lambda
     <|> forall
     <|> naturals
-    <|> pProdElim
     <|> pSumIntro
     <|> pSumElim
     <|> top
@@ -115,13 +114,6 @@ infixOperator = do
   (string "*" >> prod a <$> expr)
     <|> (string "|" >> sum a <$> expr)
     <|> (string "::" >> lcons a <$> expr)
-
-pProdElim :: Parser Expr
-pProdElim = do
-  _ <- string "prodElim "
-  f <- aexpr
-  _ <- string " "
-  prodElim f <$> aexpr
 
 pSumIntro :: Parser Expr
 pSumIntro =

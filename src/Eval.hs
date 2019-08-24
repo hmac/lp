@@ -26,6 +26,8 @@ reduce' ctx = go
     Fix (App (Fix (Lam x e)) b) -> substitute x e b
     Fix (App (Fix (App (Fix (App (Fix (App (Fix NatElim) m)) mz)) ms)) k) ->
       evalNatElim ctx m mz ms k
+    Fix (App (Fix (App (Fix (App (Fix (App (Fix (App (Fix ProdElim) _a)) _b)) _c)) f)) p)
+      -> evalProdElim ctx f p
     Fix (App a b) -> Fix (App (go a) (go b))
     -- When eval'ing under a lambda, we add the lambda's binding to the
     -- environment with a value of (Var <binding>) to ensure that we don't
@@ -54,11 +56,9 @@ reduce' ctx = go
     Fix (FinElim m mz ms n (Fix (FSuc k))) -> finElim m mz ms n (fsuc (go k))
     Fix (FinElim m mz ms n k             ) -> finElim m mz ms n (go k)
 
-    Fix (Prod     a b                    ) -> prod (go a) (go b)
-    Fix (ProdElim f (Fix (Prod a b))     ) -> app (app f a) b
-    Fix (ProdElim f p                    ) -> prodElim f (go p)
+    Fix (Prod a b                        ) -> prod (go a) (go b)
 
-    Fix (Sum      l r                    ) -> sum (go l) (go r)
+    Fix (Sum  l r                        ) -> sum (go l) (go r)
     Fix (SumL l                          ) -> suml (go l)
     Fix (SumR r                          ) -> sumr (go r)
     Fix (SumElim f _ (Fix (SumL l))      ) -> app f l
@@ -91,6 +91,10 @@ evalNatElim _ _ mz _ (Fix Zero) = mz
 evalNatElim ctx m mz ms (Fix (Suc n)) =
   app (app ms n) (evalNatElim ctx m mz ms n)
 evalNatElim ctx m mz ms k = evalNatElim ctx m mz ms (reduce' ctx k)
+
+evalProdElim :: Context -> Expr -> Expr -> Expr
+evalProdElim _   f (Fix (Prod a b)) = app (app f a) b
+evalProdElim ctx f p                = evalProdElim ctx f (reduce' ctx p)
 
 substitute :: String -> Expr -> Expr -> Expr
 substitute v a b = topDown' alg a

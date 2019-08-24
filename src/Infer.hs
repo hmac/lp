@@ -159,29 +159,6 @@ infer (Fix (Prod a          b         )) = do
   ta <- infer_ a
   tb <- infer_ b
   pure $ if ta == type_ && tb == type_ then type_ else prod ta tb
-infer (Fix (ProdElim f p)) = do
-  tp <- infer_ p
-  tf <- infer_ f
-  case tp of
-    Fix (Prod a b) -> case tf of
-      Fix (Pi _ ta (Fix (Pi _ tb t_result))) -> do
-        check_ p (prod ta tb)
-        pure t_result
-      _ ->
-        let expectedType = pi "_" a (pi "_" b (var "someType"))
-        in  throw
-              $  "expected "
-              ++ pp f
-              ++ " to have type "
-              ++ pp expectedType
-              ++ ", but inferred it to be "
-              ++ pp tf
-    _ ->
-      throw
-        $  "expected "
-        ++ pp p
-        ++ " to be a product type, but inferred it to be "
-        ++ pp tp
 
 -- Sum
 infer (Fix (Sum l r)) = do

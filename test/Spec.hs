@@ -39,8 +39,11 @@ main = hspec $ do
       (var "k")
     "Nat*Nat" ~> prod nat nat
     "Zero*(Suc Zero)" ~> prod zero (suc zero)
-    "prodElim (\\a b. a) (Zero*Zero)"
-      ~> prodElim (lam "a" (lam "b" (var "a"))) (prod zero zero)
+    "prodElim Nat Nat Nat (\\a b. a) (Zero*Zero)" ~> app
+      (app (app (app (app (var "prodElim") nat) nat) nat)
+           (lam "a" (lam "b" (var "a")))
+      )
+      (prod zero zero)
     "Nat|Nat" ~> sum nat nat
     "Nat|(Nat|Type)" ~> sum nat (sum nat type_)
     "Nat|(Nat*Type)" ~> sum nat (prod nat type_)
@@ -143,11 +146,12 @@ main = hspec $ do
     "Zero*Zero" ~~ prod nat nat
     "Zero*Type" ~~ prod nat type_
     "Zero*(Zero*Zero)" ~~ prod nat (prod nat nat)
-    "prodElim ((\\a b. a) : forall (a : Nat) (b : Nat). Nat) (Zero*Zero)" ~~ nat
-    "prodElim ((\\a b. b) : forall (a : Nat) (b : Type). Type) (Zero*Nat)"
+    "prodElim Nat Nat Nat ((\\a b. a) : forall (a : Nat) (b : Nat). Nat) (Zero*Zero)"
+      ~~ nat
+    "prodElim Nat Type Type ((\\a b. b) : forall (a : Nat) (b : Type). Type) (Zero*Nat)"
       ~~ type_
     -- uncurry
-    "(\\a b c f p. prodElim f p) : forall (a : Type) (b : Type) (c : Type) (f : forall (x : a) (y : b). c) (p : a*b). c"
+    "(\\a b c f p. prodElim a b c f p) : forall (a : Type) (b : Type) (c : Type) (f : forall (x : a) (y : b). c) (p : a*b). c"
       ~~ pi
            "a"
            type_
@@ -164,12 +168,12 @@ main = hspec $ do
              )
            )
     -- fst
-    "(\\a b p. prodElim ((\\x y. x) : forall (x : a) (y : b). a) p) : forall (a : Type) (b : Type) (p : a*b). a"
+    "(\\a b p. prodElim a b a ((\\x y. x) : forall (x : a) (y : b). a) p) : forall (a : Type) (b : Type) (p : a*b). a"
       ~~ pi "a"
             type_
             (pi "b" type_ (pi "p" (prod (var "a") (var "b")) (var "a")))
     -- snd
-    "(\\a b p. prodElim ((\\x y. y) : forall (x : a) (y : b). b) p) : forall (a : Type) (b : Type) (p : a*b). b"
+    "(\\a b p. prodElim a b b ((\\x y. y) : forall (x : a) (y : b). b) p) : forall (a : Type) (b : Type) (p : a*b). b"
       ~~ pi "a"
             type_
             (pi "b" type_ (pi "p" (prod (var "a") (var "b")) (var "b")))
@@ -249,12 +253,12 @@ main = hspec $ do
     -- Nat increment
     "natElim ((\\n. Nat) : forall (n : Nat). Type) (Suc Zero) ((\\k n. Suc n) : forall (k : Nat) (n : Nat). Nat) (Suc (Suc Zero))"
       ~* "Suc (Suc (Suc Zero))"
-    "prodElim ((\\a b. a) : forall (a : Nat) (b : Nat). Nat) (Zero*Zero)"
+    "prodElim Nat Nat Nat ((\\a b. a) : forall (a : Nat) (b : Nat). Nat) (Zero*Zero)"
       ~* "Zero"
-    "prodElim ((\\a b. b) : forall (a : Nat) (b : Type). Type) (Zero*Nat)"
+    "prodElim Nat Type Type ((\\a b. b) : forall (a : Nat) (b : Type). Type) (Zero*Nat)"
       ~* "Nat"
     -- uncurry const Zero (Suc Zero) (== fst (Zero, Suc Zero))
-    "((\\a b c f p. prodElim f p) : forall (a : Type) (b : Type) (c : Type) (f : forall (x : a) (y : b). c) (p : a*b). c) Nat Nat Nat ((\\x y. x) : forall (x : Nat) (y : Nat). Nat) (Zero*(Suc Zero))"
+    "((\\a b c f p. prodElim a b c f p) : forall (a : Type) (b : Type) (c : Type) (f : forall (x : a) (y : b). c) (p : a*b). c) Nat Nat Nat ((\\x y. x) : forall (x : Nat) (y : Nat). Nat) (Zero*(Suc Zero))"
       ~* "Zero"
     "sumElim ((\\x. Zero) : forall (x : Nat). Nat) ((\\x. Zero) : forall (x : Nat). Nat) ((Left Zero) : (Nat|Nat))"
       ~* "Zero"
