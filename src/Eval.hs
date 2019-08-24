@@ -25,6 +25,8 @@ reduce' ctx = go
     Fix (Var x                ) -> fromMaybe (Fix (Var x)) (lookup x ctx)
     Fix (Ann e               _) -> e
     Fix (App (Fix (Lam x e)) b) -> substitute x e b
+
+    -- Dispatch calls to eliminators to their respective eliminator function
     Fix (App (Fix (App (Fix (App (Fix (App (Fix NatElim) m)) mz)) ms)) k) ->
       evalNatElim ctx m mz ms k
     Fix (App (Fix (App (Fix (App (Fix (App (Fix (App (Fix ProdElim) _a)) _b)) _c)) f)) p)
@@ -35,6 +37,7 @@ reduce' ctx = go
       -> evalListElim ctx l m s f
     Fix (App (Fix (App (Fix (App (Fix (App (Fix (App (Fix FinElim) m)) mz)) ms)) n)) f)
       -> evalFinElim ctx m mz ms n f
+
     Fix (App a b) -> Fix (App (go a) (go b))
     -- When eval'ing under a lambda, we add the lambda's binding to the
     -- environment with a value of (Var <binding>) to ensure that we don't
@@ -82,16 +85,17 @@ evalNatElim :: Context -> Expr -> Expr -> Expr -> Expr -> Expr
 evalNatElim _ _ mz _ (Fix Zero) = mz
 evalNatElim ctx m mz ms (Fix (Suc n)) =
   app (app ms n) (evalNatElim ctx m mz ms n)
-evalNatElim ctx m mz ms k = evalNatElim ctx m mz ms (reduce' ctx k)
+evalNatElim ctx m mz ms k =
+  app (app (app (app natElim m) mz) ms) (reduce' ctx k)
 
 evalProdElim :: Context -> Expr -> Expr -> Expr
 evalProdElim _   f (Fix (Prod a b)) = app (app f a) b
-evalProdElim ctx f p                = evalProdElim ctx f (reduce' ctx p)
+evalProdElim ctx f p                = app (app prodElim f) (reduce' ctx p)
 
 evalSumElim :: Context -> Expr -> Expr -> Expr -> Expr
 evalSumElim _   f _ (Fix (SumL l)) = app f l
 evalSumElim _   _ g (Fix (SumR r)) = app g r
-evalSumElim ctx f g s              = evalSumElim ctx f g (reduce' ctx s)
+evalSumElim ctx f g s              = app (app (app sumElim f) g) (reduce' ctx s)
 
 evalListElim :: Context -> Expr -> Expr -> Expr -> Expr -> Expr
 evalListElim _ _ (Fix LNil) s _ = s
