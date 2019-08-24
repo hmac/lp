@@ -2,6 +2,7 @@ module Main where
 
 import           Expr
 import           Expr.Pretty                    ( )
+import           Expr.Prelude
 import           Infer                          ( runInfer
                                                 , Debug(..)
                                                 )

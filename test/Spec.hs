@@ -14,6 +14,7 @@ import           Data.Either                    ( isLeft
                                                 )
 
 import           Expr
+import           Expr.Prelude
 import           Parse
 import           Infer
 import           Eval                           ( evalExpr )
