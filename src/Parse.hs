@@ -152,15 +152,11 @@ pW = do
   pure $ f a b
 
 pFin :: Parser Expr
-pFin = pFinType <|> pFZero <|> pFSuc <|> pFinElim
+pFin = pFinType <|> pFZero <|> pFSuc
  where
   pFinType = string "Fin " >> fin <$> aexpr
   pFZero   = string "FZero " >> fzero <$> aexpr
   pFSuc    = string "FSuc " >> fsuc <$> aexpr
-  pFinElim = do
-    _                 <- string "finElim"
-    [m, mz, ms, n, f] <- sequenceA $ replicate 5 (string " " >> aexpr)
-    pure $ finElim m mz ms n f
 
 lists :: Parser Expr
 lists = pListType <|> pListNil <|> pList

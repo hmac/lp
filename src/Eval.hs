@@ -33,6 +33,8 @@ reduce' ctx = go
       -> evalSumElim ctx f g s
     Fix (App (Fix (App (Fix (App (Fix (App (Fix (App (Fix ListElim) _a)) l)) m)) s)) f)
       -> evalListElim ctx l m s f
+    Fix (App (Fix (App (Fix (App (Fix (App (Fix (App (Fix FinElim) m)) mz)) ms)) n)) f)
+      -> evalFinElim ctx m mz ms n f
     Fix (App a b) -> Fix (App (go a) (go b))
     -- When eval'ing under a lambda, we add the lambda's binding to the
     -- environment with a value of (Var <binding>) to ensure that we don't
@@ -47,27 +49,19 @@ reduce' ctx = go
     Fix Type                               -> type_
     Fix Nat                                -> nat
     Fix Zero                               -> zero
-    Fix (Suc   n                         ) -> suc (go n)
+    Fix (Suc   n )                         -> suc (go n)
 
-    Fix (Fin   r                         ) -> fin (go r)
-    Fix (FZero r                         ) -> fzero (go r)
-    Fix (FSuc  r                         ) -> fsuc (go r)
+    Fix (Fin   r )                         -> fin (go r)
+    Fix (FZero r )                         -> fzero (go r)
+    Fix (FSuc  r )                         -> fsuc (go r)
 
-    Fix (FinElim _ mz _ _ (Fix (FZero k))) -> app mz k
-    Fix (FinElim m mz ms n (Fix (FSuc (Fix (FZero k))))) ->
-      app (app (app ms k) (fzero k)) (finElim m mz ms n (fzero k))
-    Fix (FinElim m mz ms n (Fix (FSuc (Fix (FSuc k))))) ->
-      app (app (app ms k) (fsuc k)) (finElim m mz ms n (fsuc k))
-    Fix (FinElim m mz ms n (Fix (FSuc k))) -> finElim m mz ms n (fsuc (go k))
-    Fix (FinElim m mz ms n k             ) -> finElim m mz ms n (go k)
+    Fix (Prod a b)                         -> prod (go a) (go b)
 
-    Fix (Prod a b                        ) -> prod (go a) (go b)
+    Fix (Sum  l r)                         -> sum (go l) (go r)
+    Fix (SumL l  )                         -> suml (go l)
+    Fix (SumR r  )                         -> sumr (go r)
 
-    Fix (Sum  l r                        ) -> sum (go l) (go r)
-    Fix (SumL l                          ) -> suml (go l)
-    Fix (SumR r                          ) -> sumr (go r)
-
-    Fix (List t                          ) -> list (go t)
+    Fix (List t  )                         -> list (go t)
     Fix LNil                               -> lnil
     Fix (LCons x xs)                       -> lcons (go x) (go xs)
 
@@ -104,6 +98,16 @@ evalListElim _ _ (Fix LNil) s _ = s
 evalListElim ctx m (Fix (LCons x xs)) s f =
   app (app (app f x) xs) (evalListElim ctx m xs s f)
 evalListElim ctx m l s f = evalListElim ctx m (reduce' ctx l) s f
+
+evalFinElim :: Context -> Expr -> Expr -> Expr -> Expr -> Expr -> Expr
+evalFinElim _ _ mz _ _ (Fix (FZero k)) = app mz k
+evalFinElim ctx m mz ms n (Fix (FSuc (Fix (FZero k)))) =
+  app (app (app ms k) (fzero k)) (evalFinElim ctx m mz ms n (fzero k))
+evalFinElim ctx m mz ms n (Fix (FSuc (Fix (FSuc k)))) =
+  app (app (app ms k) (fsuc k)) (evalFinElim ctx m mz ms n (fsuc k))
+evalFinElim ctx m mz ms n (Fix (FSuc k)) =
+  evalFinElim ctx m mz ms n (fsuc (reduce' ctx k))
+evalFinElim ctx m mz ms n k = evalFinElim ctx m mz ms n (reduce' ctx k)
 
 substitute :: String -> Expr -> Expr -> Expr
 substitute v a b = topDown' alg a

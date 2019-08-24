@@ -44,7 +44,7 @@ instance Pretty (Fix (ExprF String String)) where
       Fin    r             -> "Fin" <+> r
       FZero  r             -> "FZero" <+> r
       FSuc   r             -> "FZero" <+> r
-      FinElim m mz ms n g  -> "FinElim" <+> m <+> mz <+> ms <+> n <+> g
+      FinElim              -> "finElim"
 
 instance Pretty (Fix (ExprF () Int)) where
   pretty = cata f
@@ -83,4 +83,4 @@ instance Pretty (Fix (ExprF () Int)) where
       Fin    r             -> "Fin" <+> r
       FZero  r             -> "FZero" <+> r
       FSuc   r             -> "FZero" <+> r
-      FinElim m mz ms n g  -> "FinElim" <+> m <+> mz <+> ms <+> n <+> g
+      FinElim              -> "finElim"

@@ -49,7 +49,7 @@ data ExprF b x r -- r: inductive type, b: binder type, x: variable type
   | Fin r
   | FZero r
   | FSuc r
-  | FinElim r r r r r
+  | FinElim
   | NatElim
   deriving (Show, Eq, Functor)
 
@@ -151,9 +151,6 @@ fzero = Fix . FZero
 
 fsuc :: Expr -> Expr
 fsuc = Fix . FSuc
-
-finElim :: Expr -> Expr -> Expr -> Expr -> Expr -> Expr
-finElim m mz ms n f = Fix $ FinElim m mz ms n f
 
 -- Convert the frontend syntax into the backend syntax, replacing explicit
 -- variable names with De Bruijn indices
@@ -265,13 +262,6 @@ safeTranslate context = go (sort (map fst context))
     Fix (FSuc r) -> do
       r' <- go ctx r
       pure $ Fix $ FSuc r'
-    Fix (FinElim m mz ms n f) -> do
-      m'  <- go ctx m
-      mz' <- go ctx mz
-      ms' <- go ctx ms
-      n'  <- go ctx n
-      f'  <- go ctx f
-      pure $ Fix $ FinElim m' mz' ms' n' f'
 
 -- Prelude
 prelude :: (Context, Context)
@@ -284,6 +274,7 @@ preludeVals =
   , ("prodElim", Fix ProdElim)
   , ("sumElim" , Fix SumElim)
   , ("listElim", Fix ListElim)
+  , ("finElim" , Fix FinElim)
   ]
 
 -- Builtin function types
@@ -390,6 +381,96 @@ preludeTypes =
                 )
               )
               (app (var "m") (var "l"))
+            )
+          )
+        )
+      )
+    )
+  -- finElim : forall (m : forall (n : Nat) (_ : Fin n). Type)
+  --                  (mz : forall (n : Nat). m (Suc n) (FZero n))
+  --                  (ms : forall (n : Nat) (f : Fin n) (_ : m n f). m (Suc n) (FSuc f))
+  --                  (n : Nat)
+  --                  (f : Fin n). m n f
+  -- TODO: convert back to smart constructors
+  , ( "finElim"
+    , Fix
+      (Pi
+        "m"
+        (Fix
+          (Pi "n1"
+              (Fix Nat)
+              (Fix (Pi "f" (Fix (Fin (Fix (Var "n1")))) (Fix Type)))
+          )
+        )
+        (Fix
+          (Pi
+            "mz"
+            (Fix
+              (Pi
+                "n2"
+                (Fix Nat)
+                (Fix
+                  (App
+                    (Fix (App (Fix (Var "m")) (Fix (Suc (Fix (Var "n2"))))))
+                    (Fix (FZero (Fix (Var "n2"))))
+                  )
+                )
+              )
+            )
+            (Fix
+              (Pi
+                "ms"
+                (Fix
+                  (Pi
+                    "n3"
+                    (Fix Nat)
+                    (Fix
+                      (Pi
+                        "f"
+                        (Fix (Fin (Fix (Var "n3"))))
+                        (Fix
+                          (Pi
+                            "rec"
+                            (Fix
+                              (App
+                                (Fix (App (Fix (Var "m")) (Fix (Var "n3"))))
+                                (Fix (Var "f"))
+                              )
+                            )
+                            (Fix
+                              (App
+                                (Fix
+                                  (App (Fix (Var "m"))
+                                       (Fix (Suc (Fix (Var "n3"))))
+                                  )
+                                )
+                                (Fix (FSuc (Fix (Var "f"))))
+                              )
+                            )
+                          )
+                        )
+                      )
+                    )
+                  )
+                )
+                (Fix
+                  (Pi
+                    "n4"
+                    (Fix Nat)
+                    (Fix
+                      (Pi
+                        "f"
+                        (Fix (Fin (Fix (Var "n4"))))
+                        (Fix
+                          (App (Fix (App (Fix (Var "m")) (Fix (Var "n4"))))
+                               (Fix (Var "f"))
+                          )
+                        )
+                      )
+                    )
+                  )
+                )
+              )
             )
           )
         )

@@ -185,6 +185,7 @@ infer (Fix Void         ) = pure type_
 infer (Fix (Absurd t)   ) = check t type_ >> pure t
 infer (Fix Unit         ) = pure tt
 
+-- Equality
 infer (Fix (Equal t a b)) = label "EQ" $ do
   check_ t type_
   check_ a t
@@ -240,104 +241,6 @@ infer (Fix (FSuc  f)) = label "FSUC" $ do
         ++ pp f
         ++ " to be a Fin type, but inferred it to have type "
         ++ pp t
--- finElim : forall (m : forall (n : Nat) (_ : Fin n). Type)
---                  (mz : forall (n : Nat). m (Suc n) (FZero n))
---                  (ms : forall (n : Nat) (f : Fin n) (_ : m n f). m (Suc n) (FSuc f))
---                  (n : Nat)
---                  (f : Fin n). m n f
---
--- To typecheck this, we just construct the expected type of finElim and infer
--- the result when applying it to the arguments.
-infer (Fix (FinElim m mz ms n f)) =
-  label "FINELIM"
-    $ let
-        elim' = Fix
-          (Pi
-            "m"
-            (Fix
-              (Pi "n1"
-                  (Fix Nat)
-                  (Fix (Pi "f" (Fix (Fin (Fix (Var "n1")))) (Fix Type)))
-              )
-            )
-            (Fix
-              (Pi
-                "mz"
-                (Fix
-                  (Pi
-                    "n2"
-                    (Fix Nat)
-                    (Fix
-                      (App
-                        (Fix (App (Fix (Var "m")) (Fix (Suc (Fix (Var "n2"))))))
-                        (Fix (FZero (Fix (Var "n2"))))
-                      )
-                    )
-                  )
-                )
-                (Fix
-                  (Pi
-                    "ms"
-                    (Fix
-                      (Pi
-                        "n3"
-                        (Fix Nat)
-                        (Fix
-                          (Pi
-                            "f"
-                            (Fix (Fin (Fix (Var "n3"))))
-                            (Fix
-                              (Pi
-                                "rec"
-                                (Fix
-                                  (App
-                                    (Fix (App (Fix (Var "m")) (Fix (Var "n3"))))
-                                    (Fix (Var "f"))
-                                  )
-                                )
-                                (Fix
-                                  (App
-                                    (Fix
-                                      (App (Fix (Var "m"))
-                                           (Fix (Suc (Fix (Var "n3"))))
-                                      )
-                                    )
-                                    (Fix (FSuc (Fix (Var "f"))))
-                                  )
-                                )
-                              )
-                            )
-                          )
-                        )
-                      )
-                    )
-                    (Fix
-                      (Pi
-                        "n4"
-                        (Fix Nat)
-                        (Fix
-                          (Pi
-                            "f"
-                            (Fix (Fin (Fix (Var "n4"))))
-                            (Fix
-                              (App
-                                (Fix (App (Fix (Var "m")) (Fix (Var "n4"))))
-                                (Fix (Var "f"))
-                              )
-                            )
-                          )
-                        )
-                      )
-                    )
-                  )
-                )
-              )
-            )
-          )
-        expr = app (app (app (app (app (var "finElim") m) mz) ms) n) f
-      in
-        local (\(ts, vs, dep, deb) -> (("finElim", elim') : ts, vs, dep, deb))
-          $ infer_ expr
 
 -- Fallthrough
 infer e = throw $ "could not infer type of " <> pp e
@@ -376,7 +279,7 @@ check (Fix LNil    ) (Fix (List t   )) = label "LNIL" $ check t type_
 check e              t                 = label "CHK" $ do
   env <- ask
   trace $ "CHK " ++ pp e ++ " : " ++ pp t
-  let (types, vals, _, debug) = env
+  let (types, vals, _, _) = env
   t' <- evalExpr vals <$> infer_ e
   let tn  = evalExpr [] t
       t'b = safeTranslate types t'
@@ -391,9 +294,6 @@ check e              t                 = label "CHK" $ do
     Right t'b -> case tnb of
       Left  err -> throw $ err ++ " (when translating " ++ pp tn ++ ")"
       Right tnb -> do
-        trace $ "t: " ++ pp t
-        trace $ "t': " ++ pp t'
-        trace $ "tn: " ++ pp tn
         trace $ "t'b: " ++ pp t'b
         trace $ "tnb: " ++ pp tnb
         if t'b == tnb
