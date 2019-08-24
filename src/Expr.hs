@@ -27,7 +27,6 @@ data ExprF b x r -- r: inductive type, b: binder type, x: variable type
   | Nat
   | Zero
   | Suc r
-  | NatElim r r r r
   | Prod r r
   | ProdElim r r
   | Sum r r
@@ -51,6 +50,7 @@ data ExprF b x r -- r: inductive type, b: binder type, x: variable type
   | FZero r
   | FSuc r
   | FinElim r r r r r
+  | NatElim
   deriving (Show, Eq, Functor)
 
 $(deriveEq1 ''ExprF)
@@ -94,9 +94,6 @@ zero = Fix Zero
 
 suc :: Expr -> Expr
 suc = Fix . Suc
-
-natElim :: Expr -> Expr -> Expr -> Expr -> Expr
-natElim m mz ms k = Fix $ NatElim m mz ms k
 
 prod :: Expr -> Expr -> Expr
 prod a b = Fix $ Prod a b
@@ -216,12 +213,6 @@ safeTranslate context = go (sort (map fst context))
     Fix (Suc e) -> do
       e' <- go ctx e
       pure $ Fix $ Suc e'
-    Fix (NatElim m mz ms k) -> do
-      m'  <- go ctx m
-      mz' <- go ctx mz
-      ms' <- go ctx ms
-      k'  <- go ctx k
-      pure $ Fix $ NatElim m' mz' ms' k'
     Fix (Prod a b) -> do
       a' <- go ctx a
       b' <- go ctx b
@@ -305,3 +296,38 @@ safeTranslate context = go (sort (map fst context))
       n'  <- go ctx n
       f'  <- go ctx f
       pure $ Fix $ FinElim m' mz' ms' n' f'
+
+-- Prelude
+prelude :: (Context, Context)
+prelude = (preludeTypes, preludeVals)
+
+-- Builtin functions
+preludeVals :: Context
+preludeVals = [("natElim", Fix NatElim)]
+
+-- Builtin function types
+preludeTypes :: Context
+preludeTypes =
+    -- natElim : forall (m : forall (_ : Nat). Type)
+    --                  (mz : m Zero)
+    --                  (ms : forall (l : Nat) (_ : m l). m (Suc l)
+    --                  (k : Nat). m k
+  [ ( "natElim"
+    , pi
+      "m"
+      (pi "_" nat type_)
+      (pi
+        "mz"
+        (app (var "m") zero)
+        (pi
+          "ms"
+          (pi
+            "l"
+            nat
+            (pi "_" (app (var "m") (var "l")) (app (var "m") (suc (var "l"))))
+          )
+          (pi "k" nat (app (var "m") (var "k")))
+        )
+      )
+    )
+  ]

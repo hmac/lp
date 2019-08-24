@@ -103,15 +103,11 @@ forallVar = parens $ do
   pure (name, ttype)
 
 naturals :: Parser Expr
-naturals = pNat <|> pZero <|> pSuc <|> pNatElim
+naturals = pNat <|> pZero <|> pSuc
  where
-  pNat     = string "Nat" >> pure nat
-  pZero    = string "Zero" >> pure zero
-  pSuc     = string "Suc " >> suc <$> aexpr
-  pNatElim = do
-    _              <- string "natElim"
-    [m, mz, ms, k] <- sequenceA $ replicate 4 (string " " >> aexpr)
-    pure $ natElim m mz ms k
+  pNat  = string "Nat" >> pure nat
+  pZero = string "Zero" >> pure zero
+  pSuc  = string "Suc " >> suc <$> aexpr
 
 infixOperator :: Parser Expr
 infixOperator = do

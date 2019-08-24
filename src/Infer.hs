@@ -152,16 +152,6 @@ infer (Fix Zero   ) = pure nat
 infer (Fix (Suc n)) = label "SUC" $ do
   check_ n nat
   pure nat
-infer (Fix (NatElim m mz ms k)) = label "NATELIM" $ do
-  check_ m (pi "_" nat type_)
-  (_, vals, _, _) <- ask
-  let t = evalExpr vals (app m zero)
-  check_ mz t
-  let t' = evalExpr vals
-        $ pi "l" nat (pi "_" (app m (var "l")) (app m (suc (var "l"))))
-  check_ ms t'
-  check_ k  nat
-  pure $ evalExpr vals (app m k)
 
 -- Product
 infer (Fix (Prod (Fix Type) (Fix Type))) = pure type_
@@ -339,36 +329,6 @@ infer (Fix (FSuc  f)) = label "FSUC" $ do
 infer (Fix (FinElim m mz ms n f)) =
   label "FINELIM"
     $ let
-        elim = pi
-          "m"
-          (pi "n" nat (pi "_" (fin (var "n")) type_))
-          (pi
-            "mz"
-            (pi "n" nat (app (app (var "m") (suc (var "n"))) (fzero (var "n"))))
-            (pi
-              "ms"
-              (pi
-                "n"
-                nat
-                (pi
-                  "f"
-                  (fin (var "n"))
-                  (pi "_"
-                      (app (app (var "m") (var "n")) (var "f"))
-                      (app (app (var "m") (suc (var "n"))) (fsuc (var "f")))
-                  )
-                )
-              )
-              (pi
-                "n"
-                nat
-                (pi "f"
-                    (fin (var "n"))
-                    (app (app (var "m") (var "n")) (var "f"))
-                )
-              )
-            )
-          )
         elim' = Fix
           (Pi
             "m"

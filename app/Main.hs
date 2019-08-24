@@ -35,7 +35,7 @@ parse = runParseDefs
 
 -- Type check each definition in turn, accumulating a context of types as we go
 typecheck :: [Definition] -> Either String ([(String, Expr)], [(String, Expr)])
-typecheck = foldlM f mempty
+typecheck = foldlM f (preludeTypes, preludeVals)
  where
   f (types, vals) (Def name e) = do
     inferredType <- runInfer (types, vals) e
@@ -43,9 +43,10 @@ typecheck = foldlM f mempty
 
 -- Evaluate the first expression in the list with the others as context
 -- TODO: find 'main' and run that, even if it's not first in the list
-eval :: [(String, Expr)] -> Either String Expr
+eval :: Context -> Either String Expr
 eval vals = case lookup "main" vals of
-  Just m  -> let ctx = delete "main" vals in pure $ evalExpr ctx m
+  Just m ->
+    let ctx = delete "main" vals ++ preludeVals in pure $ evalExpr ctx m
   Nothing -> Left "'main' not found"
 
 delete :: Eq a => a -> [(a, b)] -> [(a, b)]

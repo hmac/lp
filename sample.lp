@@ -59,4 +59,4 @@ finToNat : forall (n : Nat) (f : Fin n). Nat
 finToNat = \n f. finElim (\x y. Nat) (\x. Zero) (\x y rec. Suc rec) n f
 
 main : Nat
-main = finToNat (Suc Zero) (FZero Zero)
+main = plus (Suc (Suc Zero)) (Suc Zero)

@@ -21,7 +21,7 @@ instance Pretty (Fix (ExprF String String)) where
       Nat                  -> "Nat"
       Zero                 -> "Zero"
       Suc n                -> "Suc" <+> n
-      NatElim m mz ms k    -> "natElim" <+> m <+> mz <+> ms <+> k
+      NatElim              -> "natElim"
       Prod     a b         -> a <> "*" <> b
       ProdElim g p         -> "prodElim" <+> g <+> p
       Sum      l r         -> l <> "|" <> r
@@ -60,7 +60,7 @@ instance Pretty (Fix (ExprF () Int)) where
       Nat                  -> "Nat"
       Zero                 -> "Zero"
       Suc n                -> "Suc" <+> n
-      NatElim m mz ms k    -> "natElim" <+> m <+> mz <+> ms <+> k
+      NatElim              -> "natElim"
       Prod     a b         -> a <> "*" <> b
       ProdElim g p         -> "prodElim" <+> g <+> p
       Sum      l r         -> l <> "|" <> r

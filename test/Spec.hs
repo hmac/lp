@@ -34,7 +34,9 @@ main = hspec $ do
     "Nat" ~> nat
     "Zero" ~> zero
     "Suc Zero" ~> suc zero
-    "natElim m mz ms k" ~> natElim (var "m") (var "mz") (var "ms") (var "k")
+    "natElim m mz ms k" ~> app
+      (app (app (app (var "natElim") (var "m")) (var "mz")) (var "ms"))
+      (var "k")
     "Nat*Nat" ~> prod nat nat
     "Zero*(Suc Zero)" ~> prod zero (suc zero)
     "prodElim (\\a b. a) (Zero*Zero)"
@@ -274,13 +276,13 @@ main = hspec $ do
   let pe = parse expr "" input
   pe `shouldSatisfy` isRight
   let Right e = pe
-  runInfer mempty e `shouldBe` Right expected
+  runInfer prelude e `shouldBe` Right expected
 
 -- Expect parse, infer and reject
 illTyped :: String -> Spec
 illTyped input = it ("rejects " ++ input) $ do
   let Right e = parse expr "" input
-  isLeft (runInfer mempty e) `shouldBe` True
+  isLeft (runInfer prelude e) `shouldBe` True
 
 -- Expect parse, infer & eval
 (~*) :: String -> String -> Spec
@@ -289,8 +291,8 @@ illTyped input = it ("rejects " ++ input) $ do
   let parsedExpected = parseExpr expected
   parsedInput `shouldSatisfy` isRight
   parsedExpected `shouldSatisfy` isRight
-  (parsedInput >>= runInfer mempty) `shouldSatisfy` isRight
-  (evalExpr mempty <$> parsedInput) `shouldBe` parsedExpected
+  (parsedInput >>= runInfer prelude) `shouldSatisfy` isRight
+  (evalExpr preludeVals <$> parsedInput) `shouldBe` parsedExpected
 
 parseExpr :: String -> Either String Expr
 parseExpr input = mapLeft errorBundlePretty $ parse expr "" input
