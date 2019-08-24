@@ -9,7 +9,7 @@ import           Control.Monad.Trans.Class      ( lift
                                                 , MonadTrans
                                                 )
 
-import           Expr                    hiding ( Context )
+import           Expr
 -- to import orphan Pretty instances for Expr
 import           Expr.Pretty                    ( )
 import           Eval                           ( evalExpr )
@@ -22,7 +22,6 @@ newtype Depth = Depth Int deriving (Semigroup, Monoid) via (Monoid.Sum Int)
                           deriving Show
                           deriving Num via Int
 
-type Context = [(String, Expr)]
 type Env = (Context, Context, Depth, Debug) -- (types, values, stack depth)
 
 data Debug = DebugOn | DebugOff deriving Show
@@ -77,9 +76,9 @@ runCheck env expr t = runExcept (runReaderT (check expr t) env)
 infer :: Expr -> ReaderT Env (Except String) Expr
 
 -- ANN
-infer ((Ann e t)) = label "ANN" $ do
+infer (Ann e t) = label "ANN" $ do
   trace "ANN"
-  check_ t (Type)
+  check_ t Type
   (_types, vals, _, _) <- ask
   let t' = evalExpr vals t
   trace $ "t: " ++ pp t'
@@ -87,10 +86,10 @@ infer ((Ann e t)) = label "ANN" $ do
   spy $ pure t'
 
 -- TYPE
-infer (Type   ) = pure (Type)
+infer Type    = pure Type
 
 -- VAR
-infer ((Var v)) = label "VAR" $ do
+infer (Var v) = label "VAR" $ do
   trace $ "VAR (" ++ v ++ ")"
   (types, _, _, _) <- ask
   case lookup v types of
@@ -103,18 +102,18 @@ infer ((Var v)) = label "VAR" $ do
         <> show types
 
 -- PI
-infer ((Pi x t e)) = label "PI" $ do
+infer (Pi x t e) = label "PI" $ do
   trace "PI"
-  check_ t (Type)
+  check_ t Type
   (types, vals, d, debug) <- ask
   let t'   = evalExpr vals t
   let env' = ((x, t') : types, vals, d, debug)
-  _ <- local (const env') $ check_ e (Type)
-  spy $ pure (Type)
+  _ <- local (const env') $ check_ e Type
+  spy $ pure Type
 
 -- APP
-infer ((App e e')) = label "APP" $ do
-  trace $ "APP " ++ pp ((App e e'))
+infer (App e e') = label "APP" $ do
+  trace $ "APP " ++ pp (App e e')
   (types, vals, _, _) <- ask
   e_type              <- infer_ e
   trace $ "e: " ++ pp e
@@ -145,56 +144,56 @@ infer ((App e e')) = label "APP" $ do
         <> " )"
 
 -- Nat
-infer (Nat    ) = pure Type
-infer (Zero   ) = pure Nat
-infer ((Suc n)) = label "SUC" $ do
+infer Nat     = pure Type
+infer Zero    = pure Nat
+infer (Suc n) = label "SUC" $ do
   check_ n Nat
   pure Nat
 
 -- Product
-infer ((Prod (Type) (Type))) = pure Type
-infer ((Prod a      b     )) = do
+infer (Prod Type Type) = pure Type
+infer (Prod a    b   ) = do
   ta <- infer_ a
   tb <- infer_ b
   pure $ if ta == Type && tb == Type then Type else Prod ta tb
 
 -- Sum
-infer ((Sum l r)) = do
+infer (Sum l r) = do
   check_ r Type
   check_ l Type
   pure Type
 
 -- List
-infer ((List t)) = label "LIST" $ do
+infer (List t) = label "LIST" $ do
   check_ t Type
   pure Type
 -- If the list is a singleton, we can directly infer the type from the element
-infer ((LCons x (LNil))) = label "LCONS" $ do
+infer (LCons x LNil) = label "LCONS" $ do
   t <- infer_ x
   pure $ List t
-infer ((LCons x xs)) = label "LCONS" $ do
+infer (LCons x xs) = label "LCONS" $ do
   t <- infer_ xs
   check (LCons x LNil) t
   pure t
 
 -- Unit and Bottom
-infer (T            ) = pure Type
-infer (Void         ) = pure Type
-infer ((Absurd t)   ) = check t Type >> pure t
-infer (Unit         ) = pure T
+infer T             = pure Type
+infer Void          = pure Type
+infer (Absurd t)    = check t Type >> pure t
+infer Unit          = pure T
 
 -- Equality
-infer ((Equal t a b)) = label "EQ" $ do
+infer (Equal t a b) = label "EQ" $ do
   check_ t Type
   check_ a t
   check_ b t
   pure Type
 
-infer ((Refl a)) = label "REFL" $ do
+infer (Refl a) = label "REFL" $ do
   t <- infer_ a
   pure $ Equal t a a
 
-infer ((EqElim a m mr x y eq)) = label "EQELIM" $ do
+infer (EqElim a m mr x y eq) = label "EQELIM" $ do
   (_, vals, _, _) <- ask
   check a Type
   check m $ Pi "x" a (Pi "y" a (Pi "eq" (Equal a (Var "x") (Var "y")) Type))
@@ -205,15 +204,15 @@ infer ((EqElim a m mr x y eq)) = label "EQELIM" $ do
   pure $ evalExpr vals $ App (App (App m x) y) eq
 
 -- W constructor
-infer ((W a b)) = label "W" $ do
+infer (W a b) = label "W" $ do
   check_ a Type
   check b (Pi "x" a Type)
   pure Type
-infer ((Sup a b)) = label "SUP" $ do
+infer (Sup a b) = label "SUP" $ do
   ta <- infer_ a
   tb <- infer_ b
   case tb of
-    (Pi _ _ ((W wa wb))) -> do
+    (Pi _ _ (W wa wb)) -> do
       let tx = App wb a
       check b (Pi "_" tx (W ta wb))
       pure (W wa wb)
@@ -227,12 +226,12 @@ infer ((Sup a b)) = label "SUP" $ do
         ++ pp t
 
 -- Fin
-infer ((Fin   r)) = label "FIN" $ check_ r Nat >> pure Type
-infer ((FZero n)) = label "FZERO" $ check_ n Nat >> pure (Fin (Suc n))
-infer ((FSuc  f)) = label "FSUC" $ do
+infer (Fin   r) = label "FIN" $ check_ r Nat >> pure Type
+infer (FZero n) = label "FZERO" $ check_ n Nat >> pure (Fin (Suc n))
+infer (FSuc  f) = label "FSUC" $ do
   ft <- infer_ f
   case ft of
-    ((Fin n)) -> pure (Fin (Suc n))
+    (Fin n) -> pure (Fin (Suc n))
     t ->
       throw
         $  "expected "
@@ -246,13 +245,13 @@ infer e = throw $ "could not infer type of " <> pp e
 check :: Expr -> Expr -> ReaderT Env (Except String) ()
 
 -- Short-circuit for the most common use of check
-check (Type     ) (Type        ) = pure ()
+check Type      Type         = pure ()
 
 -- LAM
-check ((Lam x e)) ((Pi x' t t')) = label "LAM" $ do
-  trace $ "LAM " ++ pp ((Lam x e)) ++ " : " ++ pp ((Pi x' t t'))
+check (Lam x e) (Pi x' t t') = label "LAM" $ do
+  trace $ "LAM " ++ pp (Lam x e) ++ " : " ++ pp (Pi x' t t')
   (types, vals, d, debug) <- ask
-  check_ (evalExpr vals t) (Type)
+  check_ (evalExpr vals t) Type
   -- Assume (x : t) and (x' : t) and add this to the environment when checking (e : t')
   let env' = ((x, t) : (x', t) : types, vals, d, debug)
   trace $ "env': " ++ show env'
@@ -261,10 +260,10 @@ check ((Lam x e)) ((Pi x' t t')) = label "LAM" $ do
   _ <- local (const env') $ check_ e t'
   pure ()
 
-check ((SumL l)) ((Sum lt _ )) = label "SUML" $ check_ l lt
-check ((SumR r)) ((Sum _  rt)) = label "SUMR" $ check_ r rt
+check (SumL l) (Sum lt _ ) = label "SUML" $ check_ l lt
+check (SumR r) (Sum _  rt) = label "SUMR" $ check_ r rt
 
-check (LNil    ) ((List t   )) = label "LNIL" $ check t Type
+check LNil     (List t   ) = label "LNIL" $ check t Type
 
 -- 𝚪 ⊢ e :↑ t
 ------------- (CHK)
@@ -274,7 +273,7 @@ check (LNil    ) ((List t   )) = label "LNIL" $ check t Type
 -- convert them to BExprs (de Bruijn indexed) and directly compare them for
 -- structural equality.
 -- This means we can ignore differences in variable names.
-check e          t             = label "CHK" $ do
+check e        t           = label "CHK" $ do
   env <- ask
   trace $ "CHK " ++ pp e ++ " : " ++ pp t
   let (types, vals, _, _) = env
