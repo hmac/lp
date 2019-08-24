@@ -32,7 +32,7 @@ data ExprF b x r -- r: inductive type, b: binder type, x: variable type
   | Sum r r
   | SumL r
   | SumR r
-  | SumElim r r r
+  | SumElim
   | List r
   | LNil
   | LCons r r
@@ -106,9 +106,6 @@ suml = Fix . SumL
 
 sumr :: Expr -> Expr
 sumr = Fix . SumR
-
-sumElim :: Expr -> Expr -> Expr -> Expr
-sumElim lf rf s = Fix $ SumElim lf rf s
 
 list :: Expr -> Expr
 list = Fix . List
@@ -224,11 +221,6 @@ safeTranslate context = go (sort (map fst context))
     Fix (SumR r) -> do
       r' <- go ctx r
       pure $ Fix $ SumR r'
-    Fix (SumElim lf rf s) -> do
-      lf' <- go ctx lf
-      rf' <- go ctx rf
-      s'  <- go ctx s
-      pure $ Fix $ SumElim lf' rf' s'
     Fix (List t) -> do
       t' <- go ctx t
       pure $ Fix $ List t'
@@ -296,15 +288,19 @@ prelude = (preludeTypes, preludeVals)
 
 -- Builtin functions
 preludeVals :: Context
-preludeVals = [("natElim", Fix NatElim), ("prodElim", Fix ProdElim)]
+preludeVals =
+  [ ("natElim" , Fix NatElim)
+  , ("prodElim", Fix ProdElim)
+  , ("sumElim" , Fix SumElim)
+  ]
 
 -- Builtin function types
 preludeTypes :: Context
 preludeTypes =
-    -- natElim : forall (m : forall (_ : Nat). Type)
-    --                  (mz : m Zero)
-    --                  (ms : forall (l : Nat) (_ : m l). m (Suc l)
-    --                  (k : Nat). m k
+  -- natElim : forall (m : forall (_ : Nat). Type)
+  --                  (mz : m Zero)
+  --                  (ms : forall (l : Nat) (_ : m l). m (Suc l)
+  --                  (k : Nat). m k
   [ ( "natElim"
     , pi
       "m"
@@ -323,7 +319,9 @@ preludeTypes =
         )
       )
     )
-    -- prodElim : forall (a : Type) (b : Type) (c : Type). forall (f : forall (x : a) (y : b). c) (p : a*b). c
+  -- prodElim : forall (a : Type) (b : Type) (c : Type)
+  --                   (f : forall (x : a) (y : b). c)
+  --                   (p : a*b). c
   , ( "prodElim"
     , pi
       "a"
@@ -337,6 +335,31 @@ preludeTypes =
           (pi "f"
               (pi "x" (var "a") (pi "y" (var "b") (var "c")))
               (pi "p" (prod (var "a") (var "b")) (var "c"))
+          )
+        )
+      )
+    )
+  -- sumElim : forall (a : Type) (b : Type) (c : Type)
+  --                  (f : forall (x : a). c)
+  --                  (g : forall (y : b). c)
+  --                  (s : a|b). c
+  , ( "sumElim"
+    , pi
+      "a"
+      type_
+      (pi
+        "b"
+        type_
+        (pi
+          "c"
+          type_
+          (pi
+            "f"
+            (pi "x" (var "a") (var "c"))
+            (pi "g"
+                (pi "y" (var "b") (var "c"))
+                (pi "s" (sum (var "a") (var "b")) (var "c"))
+            )
           )
         )
       )

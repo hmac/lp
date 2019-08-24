@@ -165,29 +165,6 @@ infer (Fix (Sum l r)) = do
   check_ r type_
   check_ l type_
   pure type_
-infer (Fix (SumElim lf rf s)) = do
-  ts   <- infer_ s
-  t_lf <- infer_ lf
-  case ts of
-    Fix (Sum l r) -> case t_lf of
-      (Fix (Pi _ tl lf_result)) | tl == l -> do
-        check_ lf (pi "_" l lf_result)
-        check_ rf (pi "_" r lf_result)
-        pure lf_result
-      t ->
-        throw
-          $  "expected "
-          ++ pp lf
-          ++ " to have type "
-          ++ pp (pi "_" l (var "<some type>"))
-          ++ ", but inferred it to have type "
-          ++ pp t
-    t ->
-      throw
-        $  "expected "
-        ++ pp s
-        ++ " to be a Sum type, but inferred it to have type "
-        ++ pp t
 
 -- List
 infer (Fix (List t)) = label "LIST" $ do

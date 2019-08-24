@@ -48,8 +48,12 @@ main = hspec $ do
     "Nat|(Nat|Type)" ~> sum nat (sum nat type_)
     "Nat|(Nat*Type)" ~> sum nat (prod nat type_)
     "Left Zero" ~> suml zero
-    "sumElim (\\a. Zero) (\\b. Zero) (Left Type)"
-      ~> sumElim (lam "a" zero) (lam "b" zero) (suml type_)
+    "sumElim Type Nat Nat (\\a. Zero) (\\b. Zero) (Left Type)" ~> app
+      (app
+        (app (app (app (app (var "sumElim") type_) nat) nat) (lam "a" zero))
+        (lam "b" zero)
+      )
+      (suml type_)
     "[Zero, Zero]" ~> lcons zero (lcons zero lnil)
     "T" ~> tt
     "Void" ~> void
@@ -182,8 +186,7 @@ main = hspec $ do
     "(Nat|Type)" ~~ type_
     "(Nat|(Nat*Nat))" ~~ type_
     "(Left Zero) : (Nat|Type)" ~~ sum nat type_
-    "sumElim ((\\x. Zero) : forall (x : Nat). Nat) ((\\x. Zero) : forall (x : Nat). Nat) ((Left Zero) : (Nat|Nat))"
-      ~~ nat
+    "sumElim Nat Nat Nat (\\x. Zero) (\\x. Zero) (Left Zero))" ~~ nat
 
     -- List
     "List Nat" ~~ type_
@@ -233,8 +236,7 @@ main = hspec $ do
     illTyped
       "prodElim ((\\a b. b) : forall (a : Nat) (b : Type). Nat) (Zero*Nat)"
     -- projection functions should have matching return types
-    illTyped
-      "sumElim ((\\x. Type) : forall (x : Nat). Nat) ((\\x. Zero) : forall (x : Nat). Nat) ((Left Zero) : (Nat|Nat))"
+    illTyped "sumElim Nat Nat Nat (\\x. Type) (\\x. Zero) (Left Zero)"
 
   describe "Evaluation" $ do
     "((\\t x. x) : forall (t : Type) (x : t). t) Type Type" ~* "Type"
@@ -260,7 +262,7 @@ main = hspec $ do
     -- uncurry const Zero (Suc Zero) (== fst (Zero, Suc Zero))
     "((\\a b c f p. prodElim a b c f p) : forall (a : Type) (b : Type) (c : Type) (f : forall (x : a) (y : b). c) (p : a*b). c) Nat Nat Nat ((\\x y. x) : forall (x : Nat) (y : Nat). Nat) (Zero*(Suc Zero))"
       ~* "Zero"
-    "sumElim ((\\x. Zero) : forall (x : Nat). Nat) ((\\x. Zero) : forall (x : Nat). Nat) ((Left Zero) : (Nat|Nat))"
+    "sumElim Nat Nat Nat ((\\x. Zero) : forall (x : Nat). Nat) ((\\x. Zero) : forall (x : Nat). Nat) ((Left Zero) : (Nat|Nat))"
       ~* "Zero"
     -- list length
     "listElim ((\\l. Nat) : forall (l : List Nat). Type) [Zero, Zero] Zero ((\\x xs acc. Suc acc) : forall (x : Nat) (xs : List Nat) (acc : Nat). Nat)"

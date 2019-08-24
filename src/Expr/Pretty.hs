@@ -27,7 +27,7 @@ instance Pretty (Fix (ExprF String String)) where
       Sum l r              -> l <> "|" <> r
       SumL l               -> "Left" <+> l
       SumR r               -> "Right" <+> r
-      SumElim lf rf s      -> "sumElim" <+> lf <+> rf <+> s
+      SumElim              -> "sumElim"
       List t               -> "List" <+> t
       LNil                 -> "Nil"
       LCons x xs           -> x <+> "::" <+> xs
@@ -66,7 +66,7 @@ instance Pretty (Fix (ExprF () Int)) where
       Sum l r              -> l <> "|" <> r
       SumL l               -> "Left" <+> l
       SumR r               -> "Right" <+> r
-      SumElim lf rf s      -> "sumElim" <+> lf <+> rf <+> s
+      SumElim              -> "sumElim"
       List t               -> "List" <+> t
       LNil                 -> "Nil"
       LCons x xs           -> x <+> "::" <+> xs

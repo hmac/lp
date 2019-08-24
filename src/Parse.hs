@@ -55,7 +55,6 @@ aexpr =
     <|> forall
     <|> naturals
     <|> pSumIntro
-    <|> pSumElim
     <|> top
     <|> bottom
     <|> pAbsurd
@@ -118,15 +117,6 @@ infixOperator = do
 pSumIntro :: Parser Expr
 pSumIntro =
   (string "Left " >> suml <$> aexpr) <|> (string "Right " >> sumr <$> aexpr)
-
-pSumElim :: Parser Expr
-pSumElim = do
-  _ <- string "sumElim "
-  f <- aexpr
-  _ <- string " "
-  g <- aexpr
-  _ <- string " "
-  sumElim f g <$> aexpr
 
 top :: Parser Expr
 top = string "T" >> pure tt
