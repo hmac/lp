@@ -125,6 +125,10 @@ infer (Fix (App e e')) = label "APP" $ do
   case e_type of
     Fix (Pi x t t') -> do
       check_ e' t
+      trace $ "x: " ++ pp x
+      trace $ "e': " ++ pp e'
+      trace $ show vals
+      trace $ "t': " ++ pp t'
       let t'n = evalExpr ((x, e') : vals) t'
       trace $ x ++ " = " ++ pp e'
       trace $ "t': " ++ pp t'
@@ -311,8 +315,147 @@ infer (Fix (Sup a b)) = label "SUP" $ do
         ++ " but inferred it to have type "
         ++ pp t
 
-
-
+-- Fin
+infer (Fix (Fin   r)) = label "FIN" $ check_ r nat >> pure type_
+infer (Fix (FZero n)) = label "FZERO" $ check_ n nat >> pure (fin (suc n))
+infer (Fix (FSuc  f)) = label "FSUC" $ do
+  ft <- infer_ f
+  case ft of
+    (Fix (Fin n)) -> pure (fin (suc n))
+    t ->
+      throw
+        $  "expected "
+        ++ pp f
+        ++ " to be a Fin type, but inferred it to have type "
+        ++ pp t
+-- finElim : forall (m : forall (n : Nat) (_ : Fin n). Type)
+--                  (mz : forall (n : Nat). m (Suc n) (FZero n))
+--                  (ms : forall (n : Nat) (f : Fin n) (_ : m n f). m (Suc n) (FSuc f))
+--                  (n : Nat)
+--                  (f : Fin n). m n f
+--
+-- To typecheck this, we just construct the expected type of finElim and infer
+-- the result when applying it to the arguments.
+infer (Fix (FinElim m mz ms n f)) =
+  label "FINELIM"
+    $ let
+        elim = pi
+          "m"
+          (pi "n" nat (pi "_" (fin (var "n")) type_))
+          (pi
+            "mz"
+            (pi "n" nat (app (app (var "m") (suc (var "n"))) (fzero (var "n"))))
+            (pi
+              "ms"
+              (pi
+                "n"
+                nat
+                (pi
+                  "f"
+                  (fin (var "n"))
+                  (pi "_"
+                      (app (app (var "m") (var "n")) (var "f"))
+                      (app (app (var "m") (suc (var "n"))) (fsuc (var "f")))
+                  )
+                )
+              )
+              (pi
+                "n"
+                nat
+                (pi "f"
+                    (fin (var "n"))
+                    (app (app (var "m") (var "n")) (var "f"))
+                )
+              )
+            )
+          )
+        elim' = Fix
+          (Pi
+            "m"
+            (Fix
+              (Pi "n1"
+                  (Fix Nat)
+                  (Fix (Pi "f" (Fix (Fin (Fix (Var "n1")))) (Fix Type)))
+              )
+            )
+            (Fix
+              (Pi
+                "mz"
+                (Fix
+                  (Pi
+                    "n2"
+                    (Fix Nat)
+                    (Fix
+                      (App
+                        (Fix (App (Fix (Var "m")) (Fix (Suc (Fix (Var "n2"))))))
+                        (Fix (FZero (Fix (Var "n2"))))
+                      )
+                    )
+                  )
+                )
+                (Fix
+                  (Pi
+                    "ms"
+                    (Fix
+                      (Pi
+                        "n3"
+                        (Fix Nat)
+                        (Fix
+                          (Pi
+                            "f"
+                            (Fix (Fin (Fix (Var "n3"))))
+                            (Fix
+                              (Pi
+                                "rec"
+                                (Fix
+                                  (App
+                                    (Fix (App (Fix (Var "m")) (Fix (Var "n3"))))
+                                    (Fix (Var "f"))
+                                  )
+                                )
+                                (Fix
+                                  (App
+                                    (Fix
+                                      (App (Fix (Var "m"))
+                                           (Fix (Suc (Fix (Var "n3"))))
+                                      )
+                                    )
+                                    (Fix (FSuc (Fix (Var "f"))))
+                                  )
+                                )
+                              )
+                            )
+                          )
+                        )
+                      )
+                    )
+                    (Fix
+                      (Pi
+                        "n4"
+                        (Fix Nat)
+                        (Fix
+                          (Pi
+                            "f"
+                            (Fix (Fin (Fix (Var "n4"))))
+                            (Fix
+                              (App
+                                (Fix (App (Fix (Var "m")) (Fix (Var "n4"))))
+                                (Fix (Var "f"))
+                              )
+                            )
+                          )
+                        )
+                      )
+                    )
+                  )
+                )
+              )
+            )
+          )
+        expr = app (app (app (app (app (var "finElim") m) mz) ms) n) f
+      in
+        local (\(ts, vs, dep, deb) -> (("finElim", elim') : ts, vs, dep, deb))
+          $ infer_ expr
 
 -- Fallthrough
 infer e = throw $ "could not infer type of " <> pp e

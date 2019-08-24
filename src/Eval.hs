@@ -32,30 +32,43 @@ evalExpr ctx ex = head (reduceList' ex)
     Fix (Pi x t e) ->
       let ctx' = (x, Fix (Var x)) : ctx
       in  Fix (Pi x (reduce' t) (evalExpr ctx' e))
-    Fix Type                            -> type_
-    Fix Nat                             -> nat
-    Fix Zero                            -> zero
-    Fix (Suc n                        ) -> suc (reduce' n)
+    Fix Type                               -> type_
+    Fix Nat                                -> nat
+    Fix Zero                               -> zero
+    Fix (Suc n                           ) -> suc (reduce' n)
 
-    Fix (NatElim _ mz _  (Fix Zero   )) -> mz
-    Fix (NatElim m mz ms (Fix (Suc n))) -> app (app ms n) (natElim m mz ms n)
-    Fix (NatElim m mz ms k            ) -> natElim m mz ms (reduce' k)
+    Fix (NatElim _ mz _  (Fix Zero   )   ) -> mz
+    Fix (NatElim m mz ms (Fix (Suc n))   ) -> app (app ms n) (natElim m mz ms n)
+    Fix (NatElim m mz ms k               ) -> natElim m mz ms (reduce' k)
 
-    Fix (Prod     a b                 ) -> prod (reduce' a) (reduce' b)
-    Fix (ProdElim f (Fix (Prod a b))  ) -> app (app f a) b
-    Fix (ProdElim f p                 ) -> prodElim f (reduce' p)
+    Fix (Fin   r                         ) -> fin (reduce' r)
+    Fix (FZero r                         ) -> fzero (reduce' r)
+    Fix (FSuc  r                         ) -> fsuc (reduce' r)
 
-    Fix (Sum      l r                 ) -> sum (reduce' l) (reduce' r)
-    Fix (SumL l                       ) -> suml (reduce' l)
-    Fix (SumR r                       ) -> sumr (reduce' r)
-    Fix (SumElim f _ (Fix (SumL l))   ) -> app f l
-    Fix (SumElim _ g (Fix (SumR r))   ) -> app g r
-    Fix (SumElim f g s                ) -> sumElim f g (reduce' s)
+    Fix (FinElim _ mz _ _ (Fix (FZero k))) -> app mz k
+    Fix (FinElim m mz ms n (Fix (FSuc (Fix (FZero k))))) ->
+      app (app (app ms k) (fzero k)) (finElim m mz ms n (fzero k))
+    Fix (FinElim m mz ms n (Fix (FSuc (Fix (FSuc k))))) ->
+      app (app (app ms k) (fsuc k)) (finElim m mz ms n (fsuc k))
+    Fix (FinElim m mz ms n (Fix (FSuc k))) ->
+      finElim m mz ms n (fsuc (reduce' k))
+    Fix (FinElim m mz ms n k        ) -> finElim m mz ms n (reduce' k)
 
-    Fix (List t                       ) -> list (reduce' t)
-    Fix LNil                            -> lnil
-    Fix (LCons x xs               )     -> lcons (reduce' x) (reduce' xs)
-    Fix (ListElim _ (Fix LNil) s _)     -> s
+    Fix (Prod     a b               ) -> prod (reduce' a) (reduce' b)
+    Fix (ProdElim f (Fix (Prod a b))) -> app (app f a) b
+    Fix (ProdElim f p               ) -> prodElim f (reduce' p)
+
+    Fix (Sum      l r               ) -> sum (reduce' l) (reduce' r)
+    Fix (SumL l                     ) -> suml (reduce' l)
+    Fix (SumR r                     ) -> sumr (reduce' r)
+    Fix (SumElim f _ (Fix (SumL l)) ) -> app f l
+    Fix (SumElim _ g (Fix (SumR r)) ) -> app g r
+    Fix (SumElim f g s              ) -> sumElim f g (reduce' s)
+
+    Fix (List t                     ) -> list (reduce' t)
+    Fix LNil                          -> lnil
+    Fix (LCons x xs               )   -> lcons (reduce' x) (reduce' xs)
+    Fix (ListElim _ (Fix LNil) s _)   -> s
     Fix (ListElim m (Fix (LCons x xs)) s f) ->
       app (app (app f x) xs) (listElim m xs s f)
     Fix (ListElim m l s f)                 -> listElim m (reduce' l) s f

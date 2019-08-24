@@ -62,6 +62,9 @@ main = hspec $ do
     "W a b" ~> w (var "a") (var "b")
     "sup a b" ~> sup (var "a") (var "b")
     "absurd Nat" ~> absurd nat
+    "Fin Zero" ~> fin zero
+    "FZero Zero" ~> fzero zero
+    "FSuc (FZero Zero)" ~> fsuc (fzero zero)
 
   describe "Inference" $ do
     "Type" ~~ type_
@@ -199,6 +202,15 @@ main = hspec $ do
     "sup Unit ((\\x. absurd (W T (\\x. Void))) : forall (x : Void). W T (\\x. Void))"
       ~~ w tt (lam "x" void)
 
+    -- Fin
+    "Fin Zero" ~~ type_
+    "FZero Zero" ~~ fin (suc zero)
+    "FSuc (FZero Zero)" ~~ fin (suc (suc zero))
+    "FZero (Suc Zero)" ~~ fin (suc (suc zero))
+    "FZero (Suc Zero)" ~~ fin (suc (suc zero))
+    "finElim (\\a b. Nat) (\\a. Zero) (\\a b rec. Suc rec) (Suc Zero) (FZero Zero)"
+      ~~ nat
+
     -- Rejections
     -- unannotated lambdas are forbidden
     illTyped "\\x. x"
@@ -248,6 +260,8 @@ main = hspec $ do
     "listElim ((\\l. Nat) : forall (l : List Nat). Type) [Zero, Zero] Zero ((\\x xs acc. Suc acc) : forall (x : Nat) (xs : List Nat) (acc : Nat). Nat)"
       ~* "Suc (Suc Zero)"
     "eqElim Nat (\\x y eq. Nat) (\\x. Zero) Zero Zero (Refl Zero)" ~* "Zero"
+    "finElim (\\a b. Nat) (\\a. Zero) (\\a b rec. Suc rec) (Suc Zero) (FZero Zero)"
+      ~* "Zero"
 
 -- Expect parse
 (~>) :: String -> Expr -> Spec

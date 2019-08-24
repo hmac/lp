@@ -41,6 +41,10 @@ instance Pretty (Fix (ExprF String String)) where
       W   a b              -> "W" <+> a <+> b
       Sup a b              -> "sup" <+> a <+> b
       Absurd t             -> "absurd" <+> t
+      Fin    r             -> "Fin" <+> r
+      FZero  r             -> "FZero" <+> r
+      FSuc   r             -> "FZero" <+> r
+      FinElim m mz ms n g  -> "FinElim" <+> m <+> mz <+> ms <+> n <+> g
 
 instance Pretty (Fix (ExprF () Int)) where
   pretty = cata f
@@ -76,3 +80,7 @@ instance Pretty (Fix (ExprF () Int)) where
       W   a b              -> "W" <+> a <+> b
       Sup a b              -> "sup" <+> a <+> b
       Absurd t             -> "absurd" <+> t
+      Fin    r             -> "Fin" <+> r
+      FZero  r             -> "FZero" <+> r
+      FSuc   r             -> "FZero" <+> r
+      FinElim m mz ms n g  -> "FinElim" <+> m <+> mz <+> ms <+> n <+> g

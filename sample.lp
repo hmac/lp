@@ -55,5 +55,8 @@ leibniz = \a b f x y eq. eqElim a (\x y xeqy. I b (f x) (f y)) (\x. Refl (f x)) 
 withZero : forall (a : Type). forall (x : a). a*Nat
 withZero = \a x. x*Zero
 
-main : I (Nat*Nat) (Zero*Zero) (Zero*Zero)
-main = leibniz Nat (Nat*Nat) (withZero Nat) Zero Zero (Refl Zero)
+finToNat : forall (n : Nat) (f : Fin n). Nat
+finToNat = \n f. finElim (\x y. Nat) (\x. Zero) (\x y rec. Suc rec) n f
+
+main : Nat
+main = finToNat (Suc Zero) (FZero Zero)

@@ -65,6 +65,7 @@ aexpr =
     <|> pEq
     <|> pEqElim
     <|> pW
+    <|> pFin
     <|> lists
     <|> parens expr
     <|> pvar
@@ -171,6 +172,17 @@ pW = do
   f      <- (string "W" >> pure w) <|> (string "sup" >> pure sup)
   [a, b] <- sequenceA $ replicate 2 (string " " >> aexpr)
   pure $ f a b
+
+pFin :: Parser Expr
+pFin = pFinType <|> pFZero <|> pFSuc <|> pFinElim
+ where
+  pFinType = string "Fin " >> fin <$> aexpr
+  pFZero   = string "FZero " >> fzero <$> aexpr
+  pFSuc    = string "FSuc " >> fsuc <$> aexpr
+  pFinElim = do
+    _                 <- string "finElim"
+    [m, mz, ms, n, f] <- sequenceA $ replicate 5 (string " " >> aexpr)
+    pure $ finElim m mz ms n f
 
 lists :: Parser Expr
 lists = pListType <|> pListNil <|> pList <|> pListElim

@@ -47,6 +47,10 @@ data ExprF b x r -- r: inductive type, b: binder type, x: variable type
   | W r r
   | Sup r r
   | Absurd r
+  | Fin r
+  | FZero r
+  | FSuc r
+  | FinElim r r r r r
   deriving (Show, Eq, Functor)
 
 $(deriveEq1 ''ExprF)
@@ -150,6 +154,18 @@ sup a b = Fix $ Sup a b
 
 absurd :: Expr -> Expr
 absurd = Fix . Absurd
+
+fin :: Expr -> Expr
+fin = Fix . Fin
+
+fzero :: Expr -> Expr
+fzero = Fix . FZero
+
+fsuc :: Expr -> Expr
+fsuc = Fix . FSuc
+
+finElim :: Expr -> Expr -> Expr -> Expr -> Expr -> Expr
+finElim m mz ms n f = Fix $ FinElim m mz ms n f
 
 -- Convert the frontend syntax into the backend syntax, replacing explicit
 -- variable names with De Bruijn indices
@@ -273,3 +289,19 @@ safeTranslate context = go (sort (map fst context))
     Fix (Absurd r) -> do
       r' <- go ctx r
       pure $ Fix $ Absurd r'
+    Fix (Fin r) -> do
+      r' <- go ctx r
+      pure $ Fix $ Fin r'
+    Fix (FZero r) -> do
+      r' <- go ctx r
+      pure $ Fix $ FZero r'
+    Fix (FSuc r) -> do
+      r' <- go ctx r
+      pure $ Fix $ FSuc r'
+    Fix (FinElim m mz ms n f) -> do
+      m'  <- go ctx m
+      mz' <- go ctx mz
+      ms' <- go ctx ms
+      n'  <- go ctx n
+      f'  <- go ctx f
+      pure $ Fix $ FinElim m' mz' ms' n' f'
