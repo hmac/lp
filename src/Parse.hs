@@ -51,7 +51,6 @@ aexpr =
     <|> forall
     <|> naturals
     <|> pSumIntro
-    <|> top
     <|> bottom
     <|> pAbsurd
     <|> pUnit
@@ -61,6 +60,8 @@ aexpr =
     <|> pW
     <|> pFin
     <|> lists
+    <|> bools
+    <|> top
     <|> parens expr
     <|> pvar
 
@@ -71,7 +72,7 @@ annotation = do
   Ann e <$> aexpr
 
 ptype :: Parser Expr
-ptype = string "Type" >> pure Type
+ptype = Type <$ string "Type"
 
 lambda :: Parser Expr
 lambda = do
@@ -99,9 +100,9 @@ forallVar = parens $ do
 naturals :: Parser Expr
 naturals = pNat <|> pZero <|> pSuc
  where
-  pNat  = string "Nat" >> pure Nat
-  pZero = string "Zero" >> pure Zero
-  pSuc  = string "Suc " >> Suc <$> aexpr
+  pNat  = Nat <$ string "Nat"
+  pZero = Zero <$ string "Zero"
+  pSuc  = Suc <$ string "Suc " <*> aexpr
 
 infixOperator :: Parser Expr
 infixOperator = do
@@ -112,66 +113,86 @@ infixOperator = do
 
 pSumIntro :: Parser Expr
 pSumIntro =
-  (string "Left " >> SumL <$> aexpr) <|> (string "Right " >> SumR <$> aexpr)
+  (SumL <$ string "Left " <*> aexpr) <|> (SumR <$ string "Right " <*> aexpr)
 
 top :: Parser Expr
-top = string "T" >> pure T
+top = T <$ string "T"
 
 bottom :: Parser Expr
-bottom = string "Void" >> pure Void
+bottom = Void <$ string "Void"
 
 pAbsurd :: Parser Expr
-pAbsurd = string "absurd " >> Absurd <$> aexpr
+pAbsurd = do
+  _      <- string "absurd"
+  [t, e] <- aexprs 2
+  pure $ Absurd t e
 
 pUnit :: Parser Expr
-pUnit = string "Unit" >> pure Unit
+pUnit = Unit <$ string "Unit"
 
 pRefl :: Parser Expr
-pRefl = string "Refl " >> Refl <$> aexpr
+pRefl = Refl <$ string "Refl " <*> aexpr
 
 pEq :: Parser Expr
 pEq = do
   _         <- string "I"
-  [t, a, b] <- sequenceA $ replicate 3 (string " " >> aexpr)
+  [t, a, b] <- aexprs 3
   pure $ Equal t a b
 
 pEqElim :: Parser Expr
 pEqElim = do
   _                    <- string "eqElim"
-  [a, m, mr, x, y, eq] <- sequenceA $ replicate 6 (string " " >> aexpr)
+  [a, m, mr, x, y, eq] <- aexprs 6
   pure $ EqElim a m mr x y eq
 
 pW :: Parser Expr
-pW = do
-  f      <- (string "W" >> pure W) <|> (string "sup" >> pure Sup)
-  [a, b] <- sequenceA $ replicate 2 (string " " >> aexpr)
-  pure $ f a b
+pW = w <|> sup <|> rec
+ where
+  w = do
+    _      <- string "W"
+    [a, b] <- aexprs 2
+    pure $ W a b
+  sup = do
+    _      <- string "sup"
+    [a, b] <- aexprs 2
+    pure $ Sup a b
+  rec = do
+    _          <- string "Rec"
+    [m, w_, r] <- aexprs 3
+    pure $ Rec m w_ r
 
 pFin :: Parser Expr
 pFin = pFinType <|> pFZero <|> pFSuc
  where
-  pFinType = string "Fin " >> Fin <$> aexpr
-  pFZero   = string "FZero " >> FZero <$> aexpr
-  pFSuc    = string "FSuc " >> FSuc <$> aexpr
+  pFinType = Fin <$ string "Fin " <*> aexpr
+  pFZero   = FZero <$ string "FZero " <*> aexpr
+  pFSuc    = FSuc <$ string "FSuc " <*> aexpr
 
 lists :: Parser Expr
 lists = pListType <|> pListNil <|> pList
+ where
+  pListType = do
+    _ <- string "List "
+    List <$> aexpr
 
-pListType :: Parser Expr
-pListType = do
-  _ <- string "List "
-  List <$> aexpr
+  pListNil = LNil <$ string "[]"
 
-pListNil :: Parser Expr
-pListNil = string "[]" >> pure LNil
+  pList    = brackets $ do
+    elems <- expr `sepBy` string ", "
+    pure $ foldr LCons LNil elems
 
-pList :: Parser Expr
-pList = brackets $ do
-  elems <- expr `sepBy` string ", "
-  pure $ foldr LCons LNil elems
+bools :: Parser Expr
+bools = true <|> false <|> bool
+ where
+  true  = string "True" >> pure BTrue
+  false = BFalse <$ string "False" -- does this do the right thing?
+  bool  = Boolean <$ string "Bool"
 
 pvar :: Parser Expr
 pvar = Var <$> termName
+
+aexprs :: Int -> Parser [Expr]
+aexprs i = sequenceA $ replicate i (string " " >> aexpr)
 
 termName :: Parser String
 termName = some alphaNumChar

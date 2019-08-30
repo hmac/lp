@@ -19,11 +19,15 @@ dependencies:
 - transformers
 - megaparsec
 - prettyprinter
+- prettyprinter-ansi-terminal
+- safe
+- terminal-size
 
 library:
   source-dirs: src
   ghc-options:
   - -Wall
+  - -Wno-missing-pattern-synonym-signatures
 
 executables:
   lp-exe:
@@ -35,6 +39,7 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - lp
+    - optparse-applicative
 
 tests:
   lp-test:

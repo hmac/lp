@@ -58,5 +58,125 @@ withZero = \a x. x*Zero
 finToNat : forall (n : Nat) (f : Fin n). Nat
 finToNat = \n f. finElim (\x y. Nat) (\x. Zero) (\x y rec. Suc rec) n f
 
+a : Type
+a = T|Nat
+
+-- returns True if the node is null - i.e. an empty constructor
+-- this is polymorphic and works for trees and lists
+-- it expects the a in your W a b type to be T|t for some arbitrary t.
+isnull : forall (t : Type). forall (x : T|t). Bool
+isnull = \t. sumElim T t Bool (\x. True) (\z. False)
+
+b : forall (x : a). Type
+b = \x. ((I Bool (isnull Nat x) True)*Void)|((I Bool (isnull Nat x) False)*Bool)
+
+bb : forall (x : a). Type
+bb = \x. ((I Bool (isnull Nat x) True)*Void)|Void
+
+foo : W a bb
+foo = sup ((Left Unit) : a) ((sumElim ((I Bool True True)*Void) Void (W a bb) (prodElim (I Bool True True) Void (W a bb) (\triv void. absurd (W a bb) void)) (\void. absurd (W a bb) void)) : forall (x : ((I Bool True True)*Void)|Void). (W a bb))
+
+leafHasNoLeftPredecessor : forall (x : (I Bool True True)*Void). W a b
+leafHasNoLeftPredecessor = \x. prodElim (I Bool True True) Void (W a b) (\triv void. absurd (W a b) void) x
+
+leafHasNoRightPredecessor : forall (x : (I Bool True False)*Bool). W a b
+leafHasNoRightPredecessor = \x. prodElim (I Bool True False) Bool (W a b) (\trueEqFalse branch. absurd (W a b) (boolAxiom trueEqFalse)) x
+
+treeLeaf : W a b
+treeLeaf = sup ((Left Unit) : a) ((\x. sumElim ((I Bool True True)*Void) ((I Bool True False)*Bool) (W a b) leafHasNoLeftPredecessor leafHasNoRightPredecessor x) : (forall (x : b (Left Unit)). W a b))
+
+--   0
+--  / \
+-- x   x
+treeNode : W a b
+treeNode = sup ((Right Zero) : a) ((\x. treeLeaf) : forall (x : b (Right Zero)). W a b)
+
+falseNotEqTrue : forall (nope : I Bool False True). Void
+falseNotEqTrue = \nope. boolAxiom (eqsymm Bool False True nope)
+
+nodeHasPredecessors : forall (x : (I Bool False True)*Void). W a b
+nodeHasPredecessors = \x. prodElim (I Bool False True) Void (W a b) (\nope void. absurd (W a b) void) x
+
+tree2Branching : forall (bbb : Bool). W a b
+tree2Branching = \branch. boolElim (\x. W a b) treeLeaf treeNode branch
+
+tree2Predecessors : forall (right : (I Bool False False)*Bool). W a b
+tree2Predecessors = \right. prodElim (I Bool False False) Bool (W a b) (\feqf branch. tree2Branching branch) right
+
+--   0
+--  / \
+-- x   0
+--    / \
+--   x   x
+tree2 : W a b
+tree2 = sup ((Right Zero) : a) ((\x. sumElim ((I Bool False True)*Void) ((I Bool False False)*Bool) (W a b) nodeHasPredecessors tree2Predecessors x) : forall (x : b (Right Zero)). W a b)
+
+--     0
+--    / \
+--   /   \
+--  0     0
+-- / \   / \
+-- x  x x   x
+
+tree3Branching : forall (bbb : Bool). W a b
+tree3Branching = \branch. boolElim (\x. W a b) treeNode treeNode branch
+
+tree3Predecessors : forall (right : (I Bool False False)*Bool). W a b
+tree3Predecessors = \right. prodElim (I Bool False False) Bool (W a b) (\feqf branch. tree3Branching branch) right
+
+tree3 : W a b
+tree3 = sup ((Right Zero) : a) ((\x. sumElim ((I Bool False True)*Void) ((I Bool False False)*Bool) (W a b) nodeHasPredecessors tree3Predecessors x) : forall (x : b (Right Zero)). W a b)
+
+
+
+-- let's try to make a list of bools, then
+
+lA : Type
+lA = T|Bool
+
+lNil : forall (x : lA). Type
+lNil = \x. (I Bool (isnull Bool x) True)*Void
+
+lCons : forall (x : lA). Type
+lCons = \x. (I Bool (isnull Bool x) False)*T
+
+lB : forall (x : lA). Type
+lB = \x. (lNil x)|(lCons x)
+
+nilListBoolHasNoPredecessors : forall (x : (I Bool True True)*Void). W lA lB
+nilListBoolHasNoPredecessors = \x. prodElim (I Bool True True) Void (W lA lB) (\triv void. absurd (W lA lB) void) x
+
+nilListIsNotCons : forall (x : (I Bool True False)*T). W lA lB
+nilListIsNotCons = \x. prodElim (I Bool True False) T (W lA lB) (\nope unit. absurd (W lA lB) (boolAxiom nope)) x
+
+emptyListBoolRec : forall (x : lB (Left Unit)). W lA lB
+emptyListBoolRec = \x. sumElim (lNil (Left Unit)) (lCons (Left Unit)) (W lA lB) nilListBoolHasNoPredecessors nilListIsNotCons x
+
+elimFalseTrueProd : forall (a : Type). forall (x : (I Bool False True)*a). Void
+elimFalseTrueProd = \a x. prodElim (I Bool False True) a Void (\falseEqTrue whatev. falseNotEqTrue falseEqTrue) x
+
+-- Nil
+emptyListOfBools : W lA lB
+emptyListOfBools = sup ((Left Unit) : lA) emptyListBoolRec
+
+consIsNotNil : forall (v : Bool) (y : lNil (Right v)). W lA lB
+consIsNotNil = \v y. absurd (W lA lB) (elimFalseTrueProd Void y)
+
+-- Cons 
+singletonListRec : forall (v : Bool) (x : lB (Right v)). W lA lB
+singletonListRec = \v x. sumElim (lNil (Right v)) (lCons (Right v)) (W lA lB) (consIsNotNil v) (\z. emptyListOfBools) x
+
+singletonList : W lA lB
+singletonList = sup ((Right True) : lA) (singletonListRec True)
+
+trueFalseListRec : forall (x : lB (Right True)). W lA lB
+trueFalseListRec = \x. sumElim (lNil (Right True)) (lCons (Right True)) (W lA lB) (consIsNotNil True) (\z. singletonListRec False (Right z)) x
+
+trueFalseList : W lA lB
+trueFalseList = sup ((Right True) : lA) trueFalseListRec
+
+testRec : Nat
+testRec = Rec (\x. Nat) tree3 (\t f rec. sumElim T Nat Nat (\x. Zero) (\x. Suc x) t)
+
 main : Nat
-main = finToNat (Suc Zero) (FZero Zero)
+main = testRec

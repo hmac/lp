@@ -8,6 +8,7 @@ import           Text.Megaparsec                ( parse
 import           Data.Either                    ( isLeft
                                                 , isRight
                                                 )
+import           Data.Foldable                  ( foldlM )
 
 import           Expr
 import           Expr.Prelude
@@ -66,10 +67,14 @@ main = hspec $ do
     "eqElim T T T T T T T" ~> App (EqElim T T T T T T) T
     "W a b" ~> W (Var "a") (Var "b")
     "sup a b" ~> Sup (Var "a") (Var "b")
-    "absurd Nat" ~> Absurd Nat
+    "Rec m w r" ~> Rec (Var "m") (Var "w") (Var "r")
+    "absurd Nat x" ~> Absurd Nat (Var "x")
     "Fin Zero" ~> Fin Zero
     "FZero Zero" ~> FZero Zero
     "FSuc (FZero Zero)" ~> FSuc (FZero Zero)
+    "Bool" ~> Boolean
+    "True" ~> BTrue
+    "False" ~> BFalse
 
   describe "Inference" $ do
     "Type" ~~ Type
@@ -191,6 +196,7 @@ main = hspec $ do
     -- Unit and Bottom
     "T" ~~ Type
     "Void" ~~ Type
+    "(\\x. absurd Nat x) : forall (x : Void). Nat" ~~ Pi "x" Void Nat
     "Unit" ~~ T
 
     -- Equality
@@ -200,7 +206,7 @@ main = hspec $ do
 
     -- W
     "W T (\\x. T)" ~~ Type
-    "sup Unit ((\\x. absurd (W T (\\x. Void))) : forall (x : Void). W T (\\x. Void))"
+    "sup Unit ((\\x. absurd (W T (\\x. Void)) x) : forall (x : Void). W T (\\x. Void))"
       ~~ W T (Lam "x" Void)
 
     -- Fin
@@ -211,6 +217,16 @@ main = hspec $ do
     "FZero (Suc Zero)" ~~ Fin (Suc (Suc Zero))
     "finElim (\\a b. Nat) (\\a. Zero) (\\a b rec. Suc rec) (Suc Zero) (FZero Zero)"
       ~~ Nat
+
+    -- Bool
+    "Bool" ~~ Type
+    "True" ~~ Boolean
+    "False" ~~ Boolean
+    "boolElim (\\x. Nat) Zero (Suc Zero) True" ~~ Nat
+
+    -- The Boolean axiom: False =/= True
+    "(\\trueEqFalse. absurd Nat (boolAxiom trueEqFalse)) : forall (eq : I Bool True False). Nat"
+      ~~ Pi "eq" (Equal Boolean BTrue BFalse) Nat
 
     -- Rejections
     -- unannotated lambdas are forbidden
@@ -229,6 +245,8 @@ main = hspec $ do
       "prodElim ((\\a b. b) : forall (a : Nat) (b : Type). Nat) (Zero*Nat)"
     -- projection functions should have matching return types
     illTyped "sumElim Nat Nat Nat (\\x. Type) (\\x. Zero) (Left Zero)"
+    -- absurd's second argument must have type Void
+    illTyped "absurd Nat Zero"
 
   describe "Evaluation" $ do
     "((\\t x. x) : forall (t : Type) (x : t). t) Type Type" ~* "Type"
@@ -251,6 +269,8 @@ main = hspec $ do
       ~* "Zero"
     "prodElim Nat Type Type ((\\a b. b) : forall (a : Nat) (b : Type). Type) (Zero*Nat)"
       ~* "Nat"
+    "prodElim Nat Type Type (\\a b. b) (((\\x. x) : forall (p : (Nat*Type)). (Nat*Type)) (Zero*Nat))"
+      ~* "Nat"
     -- uncurry const Zero (Suc Zero) (== fst (Zero, Suc Zero))
     "((\\a b c f p. prodElim a b c f p) : forall (a : Type) (b : Type) (c : Type) (f : forall (x : a) (y : b). c) (p : a*b). c) Nat Nat Nat ((\\x y. x) : forall (x : Nat) (y : Nat). Nat) (Zero*(Suc Zero))"
       ~* "Zero"
@@ -262,6 +282,29 @@ main = hspec $ do
     "eqElim Nat (\\x y eq. Nat) (\\x. Zero) Zero Zero (Refl Zero)" ~* "Zero"
     "finElim (\\a b. Nat) (\\a. Zero) (\\a b rec. Suc rec) (Suc Zero) (FZero Zero)"
       ~* "Zero"
+    "boolElim (\\x. Nat) Zero (Suc Zero) True" ~* "Zero"
+
+  describe "Regression tests" $ do
+    typecheckFile "0_variable_capture.lp"
+
+-- Load a fixture file from test/fixtures and typecheck it
+typecheckFile :: String -> Spec
+typecheckFile filename = it ("typechecks " ++ filename) $ do
+  input <- readFile $ "test/fixtures/" ++ filename
+  case runParseDefs input of
+    Left  err  -> expectationFailure (show err)
+    Right prog -> case typecheck prog of
+      Left  err -> expectationFailure (show err)
+      Right _   -> pure ()
+ where
+    -- Stolen from  main - DRY this up!
+  typecheck
+    :: [Definition] -> Either String ([(String, Expr)], [(String, Expr)])
+  typecheck = foldlM f (preludeTypes, preludeVals)
+   where
+    f (types, vals) (Def name e) = do
+      inferredType <- runInferS (types, vals) e
+      pure ((name, inferredType) : types, (name, e) : vals)
 
 -- Expect parse
 (~>) :: String -> Expr -> Spec
@@ -274,13 +317,13 @@ main = hspec $ do
   let pe = parse expr "" input
   pe `shouldSatisfy` isRight
   let Right e = pe
-  runInfer prelude e `shouldBe` Right expected
+  runInferS prelude e `shouldBe` Right expected
 
 -- Expect parse, infer and reject
 illTyped :: String -> Spec
 illTyped input = it ("rejects " ++ input) $ do
   let Right e = parse expr "" input
-  isLeft (runInfer prelude e) `shouldBe` True
+  isLeft (runInferS prelude e) `shouldBe` True
 
 -- Expect parse, infer & eval
 (~*) :: String -> String -> Spec
@@ -289,7 +332,7 @@ illTyped input = it ("rejects " ++ input) $ do
   let parsedExpected = parseExpr expected
   parsedInput `shouldSatisfy` isRight
   parsedExpected `shouldSatisfy` isRight
-  (parsedInput >>= runInfer prelude) `shouldSatisfy` isRight
+  (parsedInput >>= runInferS prelude) `shouldSatisfy` isRight
   (evalExpr preludeVals <$> parsedInput) `shouldBe` parsedExpected
 
 parseExpr :: String -> Either String Expr
@@ -298,3 +341,7 @@ parseExpr input = mapLeft errorBundlePretty $ parse expr "" input
 mapLeft :: (a -> c) -> Either a b -> Either c b
 mapLeft f (Left  e) = Left (f e)
 mapLeft _ (Right x) = Right x
+
+-- runInfer with String errors
+runInferS :: (Context, Context) -> Expr -> Either String Expr
+runInferS env e = mapLeft show $ runInfer env e

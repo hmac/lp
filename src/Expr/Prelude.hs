@@ -8,11 +8,13 @@ prelude = (preludeTypes, preludeVals)
 -- Builtin functions
 preludeVals :: Context
 preludeVals =
-  [ ("natElim" , NatElim)
-  , ("prodElim", ProdElim)
-  , ("sumElim" , SumElim)
-  , ("listElim", ListElim)
-  , ("finElim" , FinElim)
+  [ ("natElim"  , NatElim)
+  , ("prodElim" , ProdElim)
+  , ("sumElim"  , SumElim)
+  , ("listElim" , ListElim)
+  , ("finElim"  , FinElim)
+  , ("boolElim" , BoolElim)
+  , ("boolAxiom", BoolAxiom)
   ]
 
 -- Builtin function types
@@ -60,30 +62,8 @@ preludeTypes =
         )
       )
     )
-  -- sumElim : forall (a : Type) (b : Type) (c : Type)
-  --                  (f : forall (x : a). c)
-  --                  (g : forall (y : b). c)
-  --                  (s : a|b). c
   , ( "sumElim"
-    , Pi
-      "a"
-      Type
-      (Pi
-        "b"
-        Type
-        (Pi
-          "c"
-          Type
-          (Pi
-            "f"
-            (Pi "x" (Var "a") (Var "c"))
-            (Pi "g"
-                (Pi "y" (Var "b") (Var "c"))
-                (Pi "s" (Sum (Var "a") (Var "b")) (Var "c"))
-            )
-          )
-        )
-      )
+    , sumElimType
     )
   -- listElim : forall (a : Type)
   --                   (l : List a)
@@ -158,4 +138,50 @@ preludeTypes =
         )
       )
     )
+  -- boolElim : forall (c : forall (x : Boolean). Type)
+  --                   (then : c True)
+  --                   (else : c False)
+  --                   (b : Boolean). c b
+  , ( "boolElim"
+    , Pi
+      "c"
+      (Pi "x" Boolean Type)
+      (Pi
+        "then"
+        (App (Var "c") BTrue)
+        (Pi "else"
+            (App (Var "c") BFalse)
+            (Pi "b" Boolean (App (Var "c") (Var "b")))
+        )
+      )
+    )
+  -- boolAxiom : forall (eq : True = False). Void
+  -- N.B. we provide no implementation for boolAxiom, as it should not be
+  --      possible to construct a value of type False = True
+  , ("boolAxiom", Pi "eq" (Equal Boolean BTrue BFalse) Void)
   ]
+
+-- sumElim : forall (a : Type) (b : Type) (c : Type)
+--                  (f : forall (x : a). c)
+--                  (g : forall (y : b). c)
+--                  (s : a|b). c
+sumElimType :: Expr
+sumElimType = Pi
+  "a"
+  Type
+  (Pi
+    "b"
+    Type
+    (Pi
+      "c"
+      Type
+      (Pi
+        "f"
+        (Pi "x" (Var "a") (Var "c"))
+        (Pi "g"
+            (Pi "y" (Var "b") (Var "c"))
+            (Pi "s" (Sum (Var "a") (Var "b")) (Var "c"))
+        )
+      )
+    )
+  )

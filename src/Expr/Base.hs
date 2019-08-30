@@ -34,12 +34,18 @@ data ExprF b x r -- r: inductive type, b: binder type, x: variable type
   | EqElim r r r r r r
   | W r r
   | Sup r r
-  | Absurd r
+  | Rec r r r
+  | Absurd r r
   | Fin r
   | FZero r
   | FSuc r
   | FinElim
   | NatElim
+  | Boolean
+  | BTrue
+  | BFalse
+  | BoolElim
+  | BoolAxiom
   deriving (Show, Eq, Functor)
 
 $(deriveEq1 ''ExprF)

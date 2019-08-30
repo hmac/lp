@@ -6,8 +6,7 @@ where
 
 import           Data.Functor.Foldable
 import           Expr
-import           Expr.Pretty                    ( )
-import           Pretty
+import           Expr.Pretty                    ( pp )
 import           Data.Maybe                     ( fromMaybe )
 
 evalExpr :: Context -> Expr -> Expr
@@ -23,18 +22,20 @@ reduce' :: Context -> Expr -> Expr
 reduce' ctx = go
  where
   go = \case
-    Var x            -> fromMaybe (Var x) (lookup x ctx)
-    Ann e          _ -> e
-    App (Lam x e ) b -> substitute x e b
+    Var x   -> fromMaybe (Var x) (lookup x ctx)
+    Ann e _ -> e
+    App (Lam x e) b -> substitute x e b
 
     -- Dispatch calls to eliminators to their respective eliminator function
     App (App (App (App NatElim m) mz) ms) k -> evalNatElim ctx m mz ms k
-    App (App (App (App (App ProdElim _a) _b) _c) f) p -> evalProdElim ctx f p
-    App (App (App (App (App (App SumElim _a) _b) _c) f) g) s ->
-      evalSumElim ctx f g s
+    App (App (App (App (App ProdElim a) b) c) f) p ->
+      evalProdElim ctx a b c f p
+    App (App (App (App (App (App SumElim a) b) c) f) g) s ->
+      evalSumElim ctx a b c f g s
     App (App (App (App (App ListElim _a) l) m) s) f -> evalListElim ctx l m s f
     App (App (App (App (App FinElim m) mz) ms) n) f ->
       evalFinElim ctx m mz ms n f
+    App (App (App (App BoolElim a) x) y) b -> evalBoolElim ctx a x y b
 
     App a       b              -> (App (go a) (go b))
     -- When eval'ing under a lambda, we add the lambda's binding to the
@@ -67,7 +68,7 @@ reduce' ctx = go
     T                          -> T
     Unit                       -> Unit
     Void                       -> Void
-    Absurd t                   -> Absurd (go t)
+    Absurd t e                 -> Absurd (go t) (go e)
     Equal t a b                -> Equal (go t) (go a) (go b)
     Refl a                     -> Refl (go a)
     -- TODO: check that the below is correct
@@ -75,7 +76,15 @@ reduce' ctx = go
     EqElim a m mr x y eq       -> EqElim a m mr x y (go eq)
 
     W   a b                    -> W (go a) (go b)
-    Sup a b                    -> Sup (go a) (go b)
+    Sup a f                    -> Sup (go a) (go f)
+    Rec m (Sup a f) r ->
+      App (App (App r a) f) (Lam "x" (Rec m (App f (Var "x")) r))
+    Rec m a r     -> Rec m (go a) r
+
+    Boolean       -> Boolean
+    BTrue         -> BTrue
+    BFalse        -> BFalse
+    BoolAxiom     -> BoolAxiom
     somethingElse -> error $ "Unexpected expression: " ++ pp somethingElse
 
 evalNatElim :: Context -> Expr -> Expr -> Expr -> Expr -> Expr
@@ -84,14 +93,17 @@ evalNatElim ctx m mz ms (Suc n) = App (App ms n) (evalNatElim ctx m mz ms n)
 evalNatElim ctx m mz ms k =
   App (App (App (App NatElim m) mz) ms) (reduce' ctx k)
 
-evalProdElim :: Context -> Expr -> Expr -> Expr
-evalProdElim _   f (Prod a b) = App (App f a) b
-evalProdElim ctx f p          = App (App ProdElim f) (reduce' ctx p)
+evalProdElim :: Context -> Expr -> Expr -> Expr -> Expr -> Expr -> Expr
+evalProdElim _ _ _ _ f (Prod x y) = App (App f x) y
+evalProdElim ctx a b c f p =
+  App (App (App (App (App ProdElim a) b) c) f) (reduce' ctx p)
 
-evalSumElim :: Context -> Expr -> Expr -> Expr -> Expr
-evalSumElim _   f _ (SumL l) = App f l
-evalSumElim _   _ g (SumR r) = App g r
-evalSumElim ctx f g s        = App (App (App SumElim f) g) (reduce' ctx s)
+evalSumElim :: Context -> Expr -> Expr -> Expr -> Expr -> Expr -> Expr -> Expr
+evalSumElim _ _ _ _ f _ (SumL l) = App f l
+evalSumElim _ _ _ _ _ g (SumR r) = App g r
+evalSumElim ctx a b c f g s =
+  App (App (App (App (App (App SumElim a) b) c) f) g) (reduce' ctx s)
+  -- evalSumElim ctx a b c f g (reduce' ctx s)
 
 evalListElim :: Context -> Expr -> Expr -> Expr -> Expr -> Expr
 evalListElim _ _ LNil s _ = s
@@ -109,6 +121,12 @@ evalFinElim ctx m mz ms n (FSuc k) =
   evalFinElim ctx m mz ms n (FSuc (reduce' ctx k))
 evalFinElim ctx m mz ms n k = evalFinElim ctx m mz ms n (reduce' ctx k)
 
+evalBoolElim :: Context -> Expr -> Expr -> Expr -> Expr -> Expr
+evalBoolElim _ _ iftrue _       BTrue  = iftrue
+evalBoolElim _ _ _      iffalse BFalse = iffalse
+evalBoolElim ctx a iftrue iffalse b =
+  App (App (App (App BoolElim a) iftrue) iffalse) (reduce' ctx b)
+
 substitute :: String -> Expr -> Expr -> Expr
 substitute v a b = topDown' alg a
  where
@@ -121,7 +139,8 @@ substitute v a b = topDown' alg a
                | otherwise -> Right $ Pi x t e
     e -> Right e
 
--- Recurse through a structure top-down, applying the given transformation
+-- Recurse through a structure top-down, applying the given transformation, and
+-- allowing halting.
 -- Right means carry on recursing
 -- Left means stop
 topDown' :: Functor a => (Fix a -> Either (Fix a) (Fix a)) -> Fix a -> Fix a

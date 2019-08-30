@@ -15,6 +15,7 @@ where
 
 import           Data.List                      ( elemIndex
                                                 , sort
+                                                , nub
                                                 )
 import           Expr.Synonym
 import           Expr.Base                      ( Expr
@@ -35,14 +36,16 @@ type Context = [(String, Expr)]
 -- To make this usable in the world of BExpr (where all variables are de Bruijn
 -- indices into an ordered list of variables) we take the variable names and
 -- sort them, and take that as the starting list of variables, as if they were
--- bound in that order.
+-- bound in that order. Before sorting, we remove duplicates, keeping only the
+-- first occurrence. This ensures that if a variable is shadowed, the innermost
+-- binding will be used.
 -- e.g. with a context [(a, ...), (b, ...), (f, ...), (e, ...)]
 --           and expression \x. \y. x
 --      we pretend to have \a. \b. \e. \f. \x. \y. x
 --      which produces     \   \   \   \   \   \   1
 -- TODO: recursion scheme
 safeTranslate :: Context -> Expr -> Either String BExpr
-safeTranslate context = go (sort (map fst context))
+safeTranslate context = go (sort (nub (map fst context)))
  where
   go :: [String] -> Expr -> Either String BExpr
   go ctx = \case
@@ -119,9 +122,15 @@ safeTranslate context = go (sort (map fst context))
       a' <- go ctx a
       b' <- go ctx b
       pure $ Sup a' b'
-    Absurd r -> do
-      r' <- go ctx r
-      pure $ Absurd r'
+    Rec m a b -> do
+      m' <- go ctx m
+      a' <- go ctx a
+      b' <- go ctx b
+      pure $ Rec m' a' b'
+    Absurd t e -> do
+      t' <- go ctx t
+      e' <- go ctx e
+      pure $ Absurd t' e'
     Fin r -> do
       r' <- go ctx r
       pure $ Fin r'
@@ -131,7 +140,13 @@ safeTranslate context = go (sort (map fst context))
     FSuc r -> do
       r' <- go ctx r
       pure $ FSuc r'
-    ProdElim -> pure ProdElim
-    NatElim  -> pure NatElim
-    ListElim -> pure ListElim
-    FinElim  -> pure FinElim
+    ProdElim  -> pure ProdElim
+    NatElim   -> pure NatElim
+    ListElim  -> pure ListElim
+    FinElim   -> pure FinElim
+    SumElim   -> pure SumElim
+    Boolean   -> pure Boolean
+    BTrue     -> pure BTrue
+    BFalse    -> pure BFalse
+    BoolElim  -> pure BoolElim
+    BoolAxiom -> pure BoolAxiom
